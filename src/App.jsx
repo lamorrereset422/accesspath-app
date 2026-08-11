@@ -522,7 +522,38 @@ function ProgressBar({ pct, color = C.accent, track = C.bgAlt, height = 6 }) {
     </div>
   );
 }
-
+function QuestionDots({ total, currentIndex, visible, answers, onJump }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {Array.from({ length: total }).map((_, i) => {
+        const q = visible[i];
+        const v = q ? answers[q.id] : undefined;
+        const answered = v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+        const reachable = i <= currentIndex;
+        const isCurrent = i === currentIndex;
+        return (
+          <button
+            key={i}
+            onClick={() => reachable && onJump(i)}
+            disabled={!reachable}
+            title={`Jump to question ${i + 1}`}
+            style={{
+              width: isCurrent ? 12 : 9,
+              height: isCurrent ? 12 : 9,
+              borderRadius: 999,
+              border: `1.5px solid ${isCurrent || answered ? C.accent : C.line}`,
+              background: isCurrent ? C.accent : answered ? C.accentSoft : "transparent",
+              cursor: reachable ? "pointer" : "default",
+              padding: 0,
+              flexShrink: 0,
+              opacity: reachable ? 1 : 0.4,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 function sectionPercent(section, data) {
   if (!data) return 0;
   if (data.status === "completed" || data.status === "not_applicable") return 100;
@@ -884,7 +915,7 @@ function SectionFlow({ section, data, onExit, onSave }) {
         <LetterTag id={section.id} status="in_progress" />
         <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint }}>Question {safeIndex + 1} of {total}</p>
       </div>
-      <div className="mb-8"><ProgressBar pct={((safeIndex + 1) / total) * 100} /></div>
+      <div className="mb-8"><QuestionDots total={total} currentIndex={safeIndex} visible={visible} answers={answers} onJump={(i) => { setIndex(i); persist(answers, "in_progress", i); }} /></div>
 
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: C.ink, fontWeight: 500, lineHeight: 1.4, marginBottom: q.help ? 8 : 24 }}>{q.prompt}</h2>
       {q.help && <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: C.inkSoft, marginBottom: 24, lineHeight: 1.5 }}>{q.help}</p>}
@@ -1117,7 +1148,7 @@ function ProfileView({ allData, onExit, currentPlan, onOpenPriority, onOpenContr
 /* ---------------------------------------------------------------
    Pricing view
 ----------------------------------------------------------------*/
-function PricingView({ currentPlan, onSelectPlan, onExit }) {
+function PricingView({ currentPlan, onSelectPlan, onStartCheckout, onExit }) {
   return (
     <div className="max-w-xl mx-auto px-6 py-14">
       <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
@@ -1158,7 +1189,7 @@ function PricingView({ currentPlan, onSelectPlan, onExit }) {
                 ))}
               </div>
               <button
-                onClick={() => onSelectPlan(tier.id)}
+                onClick={() => (tier.id === "free" ? onSelectPlan(tier.id) : onStartCheckout(tier.id))}
                 disabled={active}
                 style={{
                   width: "100%", padding: "10px 0", borderRadius: 8, border: active ? `1.5px solid ${C.accent}` : "none",
@@ -1444,7 +1475,7 @@ function FundingChecklistView({ allData, onExit }) {
 /* ---------------------------------------------------------------
    Dashboard
 ----------------------------------------------------------------*/
-function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, overallPct, currentPlan }) {
+function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, currentPlan }) {
   const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
   return (
     <div className="max-w-2xl mx-auto px-6 py-14">
@@ -1460,6 +1491,18 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, overallPct, 
             style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 12px", color: C.inkSoft, fontFamily: "'Inter', sans-serif", fontSize: 13, cursor: "pointer" }}
           >
             {tier.name}
+          </button>
+          <button
+            onClick={onOpenPrivacy}
+            style={{ background: "none", border: "none", color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
+          >
+            Privacy
+          </button>
+          <button
+            onClick={onOpenTerms}
+            style={{ background: "none", border: "none", color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
+          >
+            Terms
           </button>
           <button
             onClick={onOpenProfile}
@@ -1515,9 +1558,112 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, overallPct, 
 }
 
 /* ---------------------------------------------------------------
+   Legal: Privacy Policy & Terms of Service
+----------------------------------------------------------------*/
+function LegalSection({ title, children }) {
+  return (
+    <div className="mb-6">
+      <p style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 600, color: C.ink, marginBottom: 6 }}>{title}</p>
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: C.inkSoft, lineHeight: 1.6 }}>{children}</p>
+    </div>
+  );
+}
+
+function PrivacyPolicyView({ onExit }) {
+  return (
+    <div className="max-w-xl mx-auto px-6 py-14">
+      <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
+        <ChevronLeft size={16} /> Back
+      </button>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Privacy Policy</h1>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: August 10, 2026</p>
+
+      <LegalSection title="Who we are">
+        AccessPath ("we," "us," "our") provides a home-accessibility planning tool. This policy explains what information we collect, how we use it, and your choices.
+      </LegalSection>
+      <LegalSection title="Information we collect">
+        Account information (your email, handled securely by our database provider, Supabase — we never see your raw password), and your assessment data, which may include details about your mobility needs, home layout, and safety concerns. We do not currently collect payment information or use any analytics or tracking tools.
+      </LegalSection>
+      <LegalSection title="How we use your information">
+        To create and maintain your account, save your assessment progress across devices, and generate your Home Accessibility Profile and deliverables (Contractor Package, Priority Plan, Funding Checklist). We do not sell your personal information or share your assessment data with third parties for marketing.
+      </LegalSection>
+      <LegalSection title="Sensitive information">
+        Some of what you enter — mobility limitations, disabilities, or home safety concerns — is sensitive. We store it only to provide the service to you, never for advertising, and don't share it except as described below.
+      </LegalSection>
+      <LegalSection title="Who we share information with">
+        Supabase (our database provider) stores your data on our behalf. We may disclose information if required by law or to protect safety. We do not sell or rent your data.
+      </LegalSection>
+      <LegalSection title="Data retention & deletion">
+        We keep your data as long as your account is active. You can request deletion of your account and data at any time by contacting hello.accesspath@outlook.com.
+      </LegalSection>
+      <LegalSection title="Your rights">
+        You can access, update, or delete your assessment data by logging into your account, or request a full copy or deletion by contacting hello.accesspath@outlook.com.
+      </LegalSection>
+      <LegalSection title="Security">
+        We use industry-standard practices (via Supabase) to protect your data, but no online service can guarantee perfect security.
+      </LegalSection>
+      <LegalSection title="Children's privacy">
+        AccessPath is not directed at children under 13, and we do not knowingly collect information from children under 13.
+      </LegalSection>
+      <LegalSection title="Changes to this policy">
+        We may update this policy as AccessPath grows — for example, if we add payment processing or analytics. We'll update the date above when we do.
+      </LegalSection>
+      <LegalSection title="Contact us">
+        Questions about this policy? Contact us at hello.accesspath@outlook.com.
+      </LegalSection>
+    </div>
+  );
+}
+
+function TermsOfServiceView({ onExit }) {
+  return (
+    <div className="max-w-xl mx-auto px-6 py-14">
+      <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
+        <ChevronLeft size={16} /> Back
+      </button>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Terms of Service</h1>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: August 10, 2026</p>
+
+      <LegalSection title="Acceptance of terms">
+        By using AccessPath, you agree to these Terms of Service. If you don't agree, please don't use the app.
+      </LegalSection>
+      <LegalSection title="What AccessPath is (and isn't)">
+        AccessPath is a self-guided planning tool to help you document home-accessibility needs and prepare for renovations. It is not professional medical, occupational therapy, legal, or contracting advice. Always consult qualified professionals before making renovation or safety decisions.
+      </LegalSection>
+      <LegalSection title="Your account">
+        You must provide accurate information when creating an account, keep your login credentials secure, and be at least 18 years old (or the age of majority in your location).
+      </LegalSection>
+      <LegalSection title="Acceptable use">
+        You agree not to use AccessPath for any unlawful purpose, attempt to access other users' accounts or data, or interfere with the app or its infrastructure.
+      </LegalSection>
+      <LegalSection title="Pricing tiers">
+        AccessPath currently offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are not yet available for purchase; this section will be updated when payment processing is enabled.
+      </LegalSection>
+      <LegalSection title="Intellectual property">
+        The AccessPath app, design, and content are owned by us. Your assessment answers and generated deliverables belong to you — you're free to use, print, or share your own Contractor Package, Priority Plan, and Funding Checklist as you see fit.
+      </LegalSection>
+      <LegalSection title="Disclaimer of warranties">
+        AccessPath is provided "as is." We do not guarantee the app will be error-free, uninterrupted, or that it fully captures every accessibility need for your specific situation.
+      </LegalSection>
+      <LegalSection title="Limitation of liability">
+        To the fullest extent permitted by law, we are not liable for damages arising from your use of AccessPath, including decisions made based on your assessment results. Renovation, safety, and medical decisions should always involve qualified professionals.
+      </LegalSection>
+      <LegalSection title="Changes to these terms">
+        We may update these terms as the app evolves. Continued use after changes means you accept the updated terms.
+      </LegalSection>
+      <LegalSection title="Governing law">
+        These terms are governed by the laws of Maryland, USA.
+      </LegalSection>
+      <LegalSection title="Contact us">
+        Questions? Contact us at hello.accesspath@outlook.com.
+      </LegalSection>
+    </div>
+  );
+}
+/* ---------------------------------------------------------------
    Root app
 ----------------------------------------------------------------*/
-export default function AccessPathApp() {
+export default function AccessPathApp({ userId, userEmail }) {
   const [allData, setAllData] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -1525,6 +1671,9 @@ export default function AccessPathApp() {
   const [showPriority, setShowPriority] = useState(false);
   const [showContractor, setShowContractor] = useState(false);
   const [showFunding, setShowFunding] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
   const [currentPlan, setCurrentPlan] = useState("complete");
 
   useEffect(() => {
@@ -1550,6 +1699,26 @@ export default function AccessPathApp() {
     setShowPricing(false);
   };
 
+  const handleStartCheckout = async (planId) => {
+    try {
+      const res = await fetch("/.netlify/functions/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId, userId, userEmail }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url; // send them to Stripe's real checkout page
+      } else {
+        console.error("AccessPath: checkout error", data);
+        alert("Sorry, something went wrong starting checkout. Please try again.");
+      }
+    } catch (e) {
+      console.error("AccessPath: checkout error", e);
+      alert("Sorry, something went wrong starting checkout. Please try again.");
+    }
+  };
+
   const handleSave = (id, next) => {
     setAllData((prev) => ({ ...prev, [id]: next }));
     saveSection(id, next);
@@ -1569,7 +1738,9 @@ export default function AccessPathApp() {
   return (
     <div style={{ background: C.bg, minHeight: 500, fontFamily: "'Inter', sans-serif" }}>
       <style>{FONTS}</style>
-      {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onExit={() => setShowPricing(false)} />}
+      {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onStartCheckout={handleStartCheckout} onExit={() => setShowPricing(false)} />}
+      {!showPricing && showPrivacy && <PrivacyPolicyView onExit={() => setShowPrivacy(false)} />}
+{!showPricing && !showPrivacy && showTerms && <TermsOfServiceView onExit={() => setShowTerms(false)} />}  
       {!showPricing && showPriority && <PriorityPlanView allData={allData} onExit={() => setShowPriority(false)} />}
       {!showPricing && showContractor && <ContractorPackageView allData={allData} onExit={() => setShowContractor(false)} />}
       {!showPricing && showFunding && <FundingChecklistView allData={allData} onExit={() => setShowFunding(false)} />}
@@ -1584,17 +1755,19 @@ export default function AccessPathApp() {
           onOpenPricing={() => setShowPricing(true)}
         />
       )}
-      {!showPricing && !showPriority && !showContractor && !showFunding && !showProfile && !activeSection && (
+      {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && !activeSection && (
         <Dashboard
           allData={allData}
           onOpen={setActiveId}
           onOpenProfile={() => setShowProfile(true)}
           onOpenPricing={() => setShowPricing(true)}
+          onOpenPrivacy={() => setShowPrivacy(true)}
+        onOpenTerms={() => setShowTerms(true)}
           overallPct={overallPct}
           currentPlan={currentPlan}
         />
       )}
-      {!showPricing && !showPriority && !showContractor && !showFunding && !showProfile && activeSection && activeSection.builtOut && (
+      {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && activeSection && activeSection.builtOut && (
         <SectionFlow
           section={activeSection}
           data={allData[activeSection.id]}
@@ -1602,7 +1775,7 @@ export default function AccessPathApp() {
           onSave={(next) => handleSave(activeSection.id, next)}
         />
       )}
-      {!showPricing && !showPriority && !showContractor && !showFunding && !showProfile && activeSection && !activeSection.builtOut && (
+      {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && activeSection && !activeSection.builtOut && (
         <NotBuiltSection
           section={activeSection}
           data={allData[activeSection.id]}
