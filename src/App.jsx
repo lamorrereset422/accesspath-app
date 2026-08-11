@@ -1682,7 +1682,11 @@ export default function AccessPathApp({ userId, userEmail }) {
       setAllData(Object.fromEntries(entries));
       try {
         const planRes = await window.storage.get("accesspath:plan");
-        if (planRes && planRes.value) setCurrentPlan(JSON.parse(planRes.value));
+       if (planRes && planRes.value) {
+          const parsed = JSON.parse(planRes.value);
+          const planId = typeof parsed === "string" ? parsed : parsed.planId;
+          if (planId) setCurrentPlan(planId);
+        }
       } catch (e) {
         /* no plan saved yet — default stands */
       }
