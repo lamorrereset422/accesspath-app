@@ -8,7 +8,6 @@ const PRICE_IDS = {
   complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
   contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
 };
-};
 
 exports.handler = async (event) => {
   // Only allow POST requests
