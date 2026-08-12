@@ -5,8 +5,9 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 // Map our internal plan IDs to the Stripe Price IDs we'll create in Step 4.
 // (We'll fill these two in together in the next step.)
 const PRICE_IDS = {
-  complete: "price_1U310m9ff4q4D6ocZ1xcmxk7",
-  contractor: "price_1U31259ff4q4D6octAhrkoSv",
+  complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
+  contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
+};
 };
 
 exports.handler = async (event) => {
