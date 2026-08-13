@@ -650,6 +650,7 @@ function ChoiceInput({ options, value, multi, onChange }) {
           <button
             key={opt}
             onClick={() => toggle(opt)}
+            aria-pressed={sel}
             className="text-left transition"
             style={{
               padding: "10px 16px", borderRadius: 8, fontFamily: "'Inter', sans-serif",
@@ -712,6 +713,7 @@ function MeasurementInput({ value, onChange }) {
               key={u}
               onClick={() => setUnit(u)}
               disabled={!!v.special}
+              aria-pressed={v.unit === u && !v.special}
               style={{
                 padding: "9px 12px", borderRadius: 6, fontSize: 13, fontFamily: "'JetBrains Mono', monospace",
                 border: `1.5px solid ${v.unit === u && !v.special ? C.accent : C.line}`,
