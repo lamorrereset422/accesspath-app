@@ -878,7 +878,7 @@ function SectionFlow({ section, data, onExit, onSave }) {
           <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, color: C.ink, fontWeight: 600 }}>Review your answers</h1>
         </div>
         {flaggedCount > 0 && (
-          <div className="flex items-start gap-2 mb-6" style={{ background: C.alertSoft, border: `1px solid ${C.alert}22`, borderRadius: 8, padding: "10px 14px" }}>
+          <div role="alert" aria-live="assertive" className="flex items-start gap-2 mb-6" style={{ background: C.alertSoft, border: `1px solid ${C.alert}22`, borderRadius: 8, padding: "10px 14px" }}>
             <AlertTriangle size={16} color={C.alert} style={{ marginTop: 2, flexShrink: 0 }} />
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.alert }}>
               {flaggedCount} response{flaggedCount > 1 ? "s" : ""} in this section {flaggedCount > 1 ? "have" : "has"} been noted as worth extra attention. This isn't a diagnosis — it just means we'll carry it forward as a priority.
