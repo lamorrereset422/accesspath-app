@@ -819,7 +819,9 @@ function SectionFlow({ section, data, onExit, onSave }) {
   if (mode === "intro") {
     return (
       <div className="max-w-xl mx-auto px-6 py-14">
+        <div aria-live="polite" className="sr-only">{section.title} section</div>
         <button onClick={onExit} className="flex items-center gap-1 mb-10" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
+    
           <ChevronLeft size={16} /> Back to your assessment
         </button>
         <div className="flex items-center gap-4 mb-6">
@@ -907,6 +909,7 @@ function SectionFlow({ section, data, onExit, onSave }) {
   // questions mode
   return (
     <div className="max-w-xl mx-auto px-6 py-14">
+    <div aria-live="polite" className="sr-only">{section.title} — question {safeIndex + 1} of {total}</div>
       <div className="flex items-center justify-between mb-8">
         <button onClick={goBack} className="flex items-center gap-1" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
           <ChevronLeft size={16} /> Back
@@ -1481,6 +1484,7 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, onOpenPrivac
   const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
   return (
     <div className="max-w-2xl mx-auto px-6 py-14">
+      <div aria-live="polite" className="sr-only">AccessPath home dashboard</div>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2" style={{ color: C.accent }}>
           <HomeIcon size={18} />
