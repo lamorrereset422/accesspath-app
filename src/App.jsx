@@ -667,12 +667,13 @@ function ChoiceInput({ options, value, multi, onChange }) {
   );
 }
 
-function TextInput({ value, onChange, area }) {
+function TextInput({ value, onChange, area, ariaLabel }) {
   const Tag = area ? "textarea" : "input";
   return (
     <Tag
       value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
+     onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
       rows={area ? 4 : undefined}
       placeholder="Type your answer…"
       className="w-full focus:outline-none"
@@ -752,11 +753,10 @@ function QuestionInput({ q, value, onChange }) {
       return <ChoiceInput options={q.options} value={value} onChange={onChange} />;
     case "multiselect":
       return <ChoiceInput options={q.options} value={value} multi onChange={onChange} />;
-    case "text":
-      return <TextInput value={value} onChange={onChange} />;
+   case "text":
+      return <TextInput value={value} onChange={onChange} ariaLabel={q.prompt} />;
     case "textarea":
-      return <TextInput value={value} onChange={onChange} area />;
-    case "measurement":
+      return <TextInput value={value} onChange={onChange} area ariaLabel={q.prompt} />;
       return <MeasurementInput value={value} onChange={onChange} />;
     default:
       return null;
