@@ -503,6 +503,7 @@ function LetterTag({ id, status, size = "md" }) {
   const fg = filled ? "#fff" : partial ? C.gold : na ? C.inkFaint : C.inkSoft;
   return (
     <div
+    aria-label={`Section ${id}: ${STATUS_LABEL[status] || "Not started"}`}
       style={{
         width: dims.w, height: dims.h, background: bg, border: `1.5px solid ${border}`,
         color: fg, fontFamily: "'JetBrains Mono', monospace", fontSize: dims.fs,
