@@ -426,10 +426,6 @@ const STATUS_LABEL = {
 
 /* ---------------------------------------------------------------
    Pricing tiers
-   NOTE: no real payment processing happens here — there's no backend
-   to charge a card. This simulates plan selection and the resulting
-   unlock/lock behavior, so the structure is ready the moment real
-   billing (App Store, Play Store, or Stripe) gets wired in.
 ----------------------------------------------------------------*/
 const PRICING_TIERS = [
   {
@@ -1164,8 +1160,8 @@ function PricingView({ currentPlan, onSelectPlan, onStartCheckout, onExit }) {
       <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14.5, color: C.inkSoft, lineHeight: 1.6, marginBottom: 10 }}>
         Every section stays saved no matter what you pick — upgrading just unlocks the rest.
       </p>
-      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkFaint, lineHeight: 1.5, marginBottom: 28, fontStyle: "italic" }}>
-        This is a working preview of pricing, not a real checkout — no payment is being processed here yet.
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkFaint, lineHeight: 1.5, marginBottom: 28 }}>
+        Paid plans are secure one-time purchases processed by Stripe. Access is connected to your signed-in AccessPath account.
       </p>
 
       <div className="flex flex-col gap-4">
@@ -1583,13 +1579,13 @@ function PrivacyPolicyView({ onExit }) {
         <ChevronLeft size={16} /> Back
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Privacy Policy</h1>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: August 10, 2026</p>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: September 4, 2026</p>
 
       <LegalSection title="Who we are">
         AccessPath ("we," "us," "our") provides a home-accessibility planning tool. This policy explains what information we collect, how we use it, and your choices.
       </LegalSection>
       <LegalSection title="Information we collect">
-        Account information (your email, handled securely by our database provider, Supabase — we never see your raw password), and your assessment data, which may include details about your mobility needs, home layout, and safety concerns. We do not currently collect payment information or use any analytics or tracking tools.
+        Account information (your email, handled securely by our database provider, Supabase — we never see your raw password), assessment data that may include details about your mobility needs, home layout, and safety concerns, and purchase records such as your selected plan and Stripe checkout reference. Stripe processes payment details directly; AccessPath does not store your full card number.
       </LegalSection>
       <LegalSection title="How we use your information">
         To create and maintain your account, save your assessment progress across devices, and generate your Home Accessibility Profile and deliverables (Contractor Package, Priority Plan, Funding Checklist). We do not sell your personal information or share your assessment data with third parties for marketing.
@@ -1598,7 +1594,7 @@ function PrivacyPolicyView({ onExit }) {
         Some of what you enter — mobility limitations, disabilities, or home safety concerns — is sensitive. We store it only to provide the service to you, never for advertising, and don't share it except as described below.
       </LegalSection>
       <LegalSection title="Who we share information with">
-        Supabase (our database provider) stores your data on our behalf. We may disclose information if required by law or to protect safety. We do not sell or rent your data.
+        Supabase stores account and assessment data on our behalf. Stripe processes payments and receives the information necessary to complete your purchase. We may disclose information if required by law or to protect safety. We do not sell or rent your data.
       </LegalSection>
       <LegalSection title="Data retention & deletion">
         We keep your data as long as your account is active. You can request deletion of your account and data at any time by contacting hello.accesspath@outlook.com.
@@ -1613,7 +1609,7 @@ function PrivacyPolicyView({ onExit }) {
         AccessPath is not directed at children under 13, and we do not knowingly collect information from children under 13.
       </LegalSection>
       <LegalSection title="Changes to this policy">
-        We may update this policy as AccessPath grows — for example, if we add payment processing or analytics. We'll update the date above when we do.
+        We may update this policy as AccessPath grows or our service providers change. We'll update the date above when we do.
       </LegalSection>
       <LegalSection title="Contact us">
         Questions about this policy? Contact us at hello.accesspath@outlook.com.
@@ -1629,7 +1625,7 @@ function TermsOfServiceView({ onExit }) {
         <ChevronLeft size={16} /> Back
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Terms of Service</h1>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: August 10, 2026</p>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: September 4, 2026</p>
 
       <LegalSection title="Acceptance of terms">
         By using AccessPath, you agree to these Terms of Service. If you don't agree, please don't use the app.
@@ -1644,7 +1640,7 @@ function TermsOfServiceView({ onExit }) {
         You agree not to use AccessPath for any unlawful purpose, attempt to access other users' accounts or data, or interfere with the app or its infrastructure.
       </LegalSection>
       <LegalSection title="Pricing tiers">
-        AccessPath currently offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are not yet available for purchase; this section will be updated when payment processing is enabled.
+        AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. Features marked “coming soon” are not available at the time of purchase.
       </LegalSection>
       <LegalSection title="Intellectual property">
         The AccessPath app, design, and content are owned by us. Your assessment answers and generated deliverables belong to you — you're free to use, print, or share your own Contractor Package, Priority Plan, and Funding Checklist as you see fit.
@@ -1670,7 +1666,7 @@ function TermsOfServiceView({ onExit }) {
 /* ---------------------------------------------------------------
    Root app
 ----------------------------------------------------------------*/
-export default function AccessPathApp({ userId, userEmail }) {
+export default function AccessPathApp({ userId, userEmail, accessToken }) {
   const [allData, setAllData] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -1681,21 +1677,32 @@ export default function AccessPathApp({ userId, userEmail }) {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
-  const [currentPlan, setCurrentPlan] = useState("complete");
+  const [currentPlan, setCurrentPlan] = useState("free");
 
   useEffect(() => {
     (async () => {
       const entries = await Promise.all(SECTIONS.map(async (s) => [s.id, await loadSection(s.id)]));
       setAllData(Object.fromEntries(entries));
-      try {
-        const planRes = await window.storage.get("accesspath:plan");
-       if (planRes && planRes.value) {
-          const parsed = JSON.parse(planRes.value);
-          const planId = typeof parsed === "string" ? parsed : parsed.planId;
-          if (planId) setCurrentPlan(planId);
+      const checkoutStatus = new URLSearchParams(window.location.search).get("checkout");
+      const attempts = checkoutStatus === "success" ? 6 : 1;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          const planRes = await window.storage.get("accesspath:plan");
+          if (planRes && planRes.value) {
+            const parsed = JSON.parse(planRes.value);
+            const planId = typeof parsed === "string" ? parsed : parsed.planId;
+            if (planId) setCurrentPlan(planId);
+            break;
+          }
+        } catch (e) {
+          /* no paid plan saved yet — remain on Free */
         }
-      } catch (e) {
-        /* no plan saved yet — default stands */
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+      if (checkoutStatus) {
+        window.history.replaceState({}, "", window.location.pathname);
       }
     })();
   }, []);
@@ -1714,8 +1721,11 @@ export default function AccessPathApp({ userId, userEmail }) {
     try {
       const res = await fetch("/.netlify/functions/create-checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, userId, userEmail }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ planId }),
       });
       const data = await res.json();
       if (data.url) {

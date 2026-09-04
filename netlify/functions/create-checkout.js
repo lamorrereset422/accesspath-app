@@ -1,9 +1,14 @@
 // This code runs on Netlify's servers, not in the visitor's browser.
 // It's the only place allowed to know your Stripe SECRET key.
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const { createClient } = require("@supabase/supabase-js");
 
-// Map our internal plan IDs to the Stripe Price IDs we'll create in Step 4.
-// (We'll fill these two in together in the next step.)
+const supabase = createClient(
+  "https://obylhtfhlioplwscecfs.supabase.co",
+  "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT"
+);
+
+// Map internal plan IDs to Stripe Price IDs.
 const PRICE_IDS = {
   complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
   contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
@@ -16,7 +21,17 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { planId, userId, userEmail } = JSON.parse(event.body);
+    const authorization = event.headers.authorization || event.headers.Authorization || "";
+    const accessToken = authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : "";
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      return { statusCode: 401, body: JSON.stringify({ error: "Please sign in again." }) };
+    }
+
+    const { planId } = JSON.parse(event.body || "{}");
 
     const priceId = PRICE_IDS[planId];
     if (!priceId) {
@@ -29,9 +44,9 @@ exports.handler = async (event) => {
       mode: "payment",
       allow_promotion_codes: true,
       line_items: [{ price: priceId, quantity: 1 }],
-      customer_email: userEmail,
-      client_reference_id: userId,
-      metadata: { userId, planId },
+      customer_email: user.email,
+      client_reference_id: user.id,
+      metadata: { userId: user.id, planId },
       success_url: `${siteUrl}/?checkout=success`,
       cancel_url: `${siteUrl}/?checkout=cancelled`,
     });

@@ -22,14 +22,22 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: `Webhook Error: ${err.message}` };
   }
 
-  if (stripeEvent.type === 'checkout.session.completed') {
+  if (
+    stripeEvent.type === 'checkout.session.completed' ||
+    stripeEvent.type === 'checkout.session.async_payment_succeeded'
+  ) {
     const session = stripeEvent.data.object;
     const userId = session.client_reference_id;
     const planId = session.metadata?.planId; // "complete" or "contractor"
 
-    if (!userId || !planId) {
-      console.error('Missing userId or planId in session metadata');
-      return { statusCode: 400, body: 'Missing metadata' };
+    if (!userId || !['complete', 'contractor'].includes(planId)) {
+      console.error('Missing or invalid checkout metadata');
+      return { statusCode: 400, body: 'Invalid metadata' };
+    }
+
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+      console.log(`Ignoring unpaid checkout session ${session.id}`);
+      return { statusCode: 200, body: JSON.stringify({ received: true }) };
     }
 
     const { error } = await supabase

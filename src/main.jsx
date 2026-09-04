@@ -40,7 +40,11 @@ function Root() {
           Log out
         </button>
       </div>
-      <App userId={session.user.id} userEmail={session.user.email} />
+      <App
+        userId={session.user.id}
+        userEmail={session.user.email}
+        accessToken={session.access_token}
+      />
     </div>
   );
 }
