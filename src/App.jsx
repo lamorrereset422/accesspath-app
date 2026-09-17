@@ -754,6 +754,7 @@ function QuestionInput({ q, value, onChange }) {
       return <TextInput value={value} onChange={onChange} ariaLabel={q.prompt} />;
     case "textarea":
       return <TextInput value={value} onChange={onChange} area ariaLabel={q.prompt} />;
+      case "measurement":
       return <MeasurementInput value={value} onChange={onChange} />;
     default:
       return null;
@@ -763,7 +764,7 @@ function QuestionInput({ q, value, onChange }) {
 /* ---------------------------------------------------------------
    Section flow (intro -> questions -> review)
 ----------------------------------------------------------------*/
-function SectionFlow({ section, data, onExit, onSave }) {
+function SectionFlow({ section, data, onExit, onSave, onFinish }) {
   const [mode, setMode] = useState(data.status === "not_started" ? "intro" : "questions");
   const [answers, setAnswers] = useState(data.answers || {});
   const [index, setIndex] = useState(data.lastIndex || 0);
@@ -800,7 +801,7 @@ function SectionFlow({ section, data, onExit, onSave }) {
     persist(answers, "in_progress", safeIndex - 1);
   };
 
-  const markComplete = () => { persist(answers, "completed", 0); onExit(); };
+  const markComplete = () => { persist(answers, "completed", 0); onFinish(); };
   const markNotApplicable = () => { persist({}, "not_applicable", 0); onExit(); };
   const saveExit = () => { persist(answers, data.status === "completed" ? "completed" : "in_progress", safeIndex); onExit(); };
   const resetSection = () => {
@@ -1122,6 +1123,18 @@ function ProfileView({ allData, onExit, currentPlan, onOpenPriority, onOpenContr
         <Row label="Still unresolved" value={Array.isArray(P.p17) ? P.p17.join(", ") : P.p17} />
         <Row label="Biggest obstacle right now" value={P.p19} />
       </ProfilePanel>
+      <ProfilePanel title="What your Priority Plan would include" subtitle={`${safetyItems.length} safety item${safetyItems.length === 1 ? "" : "s"} ready to be prioritized`}>
+  {safetyItems.length === 0 ? (
+    <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.inkFaint }}>
+      Nothing flagged yet — that's good news. Your Priority Plan will still organize the rest of your barriers by urgency.
+    </p>
+  ) : (
+    <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.inkSoft, lineHeight: 1.6 }}>
+      {safetyItems.length} response{safetyItems.length === 1 ? "" : "s"} flagged as worth extra attention across your answers so far.
+      Your Priority Plan sorts these — and every barrier you document — into what needs attention first, so you know where to start.
+    </p>
+  )}
+</ProfilePanel>
 
       <ProfilePanel title="Your deliverables" subtitle={unlocked ? "Generated from everything above" : "Included with Contractor Ready"}>
         {[
@@ -1790,11 +1803,12 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
       )}
       {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && activeSection && activeSection.builtOut && (
         <SectionFlow
-          section={activeSection}
-          data={allData[activeSection.id]}
-          onExit={() => setActiveId(null)}
-          onSave={(next) => handleSave(activeSection.id, next)}
-        />
+  section={activeSection}
+  data={allData[activeSection.id]}
+  onExit={() => setActiveId(null)}
+  onSave={(next) => handleSave(activeSection.id, next)}
+  onFinish={() => { setActiveId(null); setShowProfile(true); }}
+/>
       )}
       {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && activeSection && !activeSection.builtOut && (
         <NotBuiltSection
