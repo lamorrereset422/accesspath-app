@@ -993,6 +993,63 @@ function ProfilePanel({ title, subtitle, children }) {
   );
 }
 
+function CompletionView({ allData, currentPlan, onExit, onOpenPriority, onOpenContractor, onOpenFunding, onOpenPricing }) {
+  const safetyItems = collectSafetyItems(allData);
+  const completedCount = SECTIONS.filter((s) => allData[s.id]?.status === "completed").length;
+  const unlocked = currentPlan === "contractor";
+
+  return (
+    <div className="max-w-xl mx-auto px-6 py-14">
+      <FileText size={22} color={C.accent} className="mb-4" />
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: C.ink, fontWeight: 600, marginBottom: 10 }}>
+        You've completed your assessment
+      </h1>
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: C.inkSoft, lineHeight: 1.6, marginBottom: 28 }}>
+        All {completedCount} sections are done. {safetyItems.length > 0 ? `${safetyItems.length} response${safetyItems.length === 1 ? "" : "s"} ${safetyItems.length === 1 ? "was" : "were"} flagged as worth extra attention.` : "Nothing was flagged as urgent — that's good news."}
+      </p>
+
+      <div className="flex flex-col gap-2 mb-8">
+        <button
+          onClick={unlocked ? onOpenPriority : onOpenPricing}
+          className="w-full flex items-center justify-between gap-4 text-left"
+          style={{ padding: "14px 16px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+        >
+          <div>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>Accessibility Priority Plan</p>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkFaint }}>See what needs attention first</p>
+          </div>
+          {unlocked ? <ChevronRight size={16} color={C.accent} /> : <Lock size={16} color={C.inkFaint} />}
+        </button>
+        <button
+          onClick={unlocked ? onOpenContractor : onOpenPricing}
+          className="w-full flex items-center justify-between gap-4 text-left"
+          style={{ padding: "14px 16px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+        >
+          <div>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>Contractor Preparation Package</p>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkFaint }}>Measurements and questions to bring to a contractor</p>
+          </div>
+          {unlocked ? <ChevronRight size={16} color={C.accent} /> : <Lock size={16} color={C.inkFaint} />}
+        </button>
+        <button
+          onClick={unlocked ? onOpenFunding : onOpenPricing}
+          className="w-full flex items-center justify-between gap-4 text-left"
+          style={{ padding: "14px 16px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+        >
+          <div>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>Funding & Documentation Checklist</p>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkFaint }}>What's done and what's still missing</p>
+          </div>
+          {unlocked ? <ChevronRight size={16} color={C.accent} /> : <Lock size={16} color={C.inkFaint} />}
+        </button>
+      </div>
+
+      <button onClick={onExit} className="flex items-center gap-1" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
+        <ChevronLeft size={16} /> Back to your profile
+      </button>
+    </div>
+  );
+}
 function ProfileView({ allData, onExit, currentPlan, onOpenPriority, onOpenContractor, onOpenFunding, onOpenPricing }) {
   const anyData = SECTIONS.some((s) => allData[s.id] && Object.keys(allData[s.id].answers || {}).length > 0);
 
@@ -1253,7 +1310,7 @@ function PriorityCategory({ title, color, description, safetyStyleItems, noteSty
   );
 }
 
-function PriorityPlanView({ allData, onExit }) {
+function PriorityPlanView({ allData, onExit, onOpenContractor }) {
   const safetyItems = collectSafetyItems(allData);
   const essential = collectBarrierNotes(allData, ["D", "E", "F"]);
   const independence = collectBarrierNotes(allData, ["G", "H", "I", "J", "N"]);
@@ -1309,6 +1366,14 @@ function PriorityPlanView({ allData, onExit }) {
         <Row label="Your overall goal" value={A.a14} />
         <Row label="Additional context" value={A.a15} />
       </ProfilePanel>
+            <button
+        onClick={onOpenContractor}
+        className="w-full flex items-center justify-between gap-4"
+        style={{ marginTop: 24, padding: "14px 16px", background: C.accent, border: "none", borderRadius: 10, cursor: "pointer" }}
+      >
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: "#fff" }}>Next: prep for your contractor</span>
+        <ChevronRight size={16} color="#fff" />
+      </button>
     </div>
   );
 }
@@ -1316,7 +1381,7 @@ function PriorityPlanView({ allData, onExit }) {
 /* ---------------------------------------------------------------
    Deliverable: Contractor Preparation Package
 ----------------------------------------------------------------*/
-function ContractorPackageView({ allData, onExit }) {
+function ContractorPackageView({ allData, onExit, onOpenFunding }) {
   const A = allData.A?.answers || {};
   const B = allData.B?.answers || {};
   const N = allData.N?.answers || {};
@@ -1417,6 +1482,14 @@ function ContractorPackageView({ allData, onExit }) {
           AccessPath doesn't replace an occupational therapist, architect, or licensed contractor — this package is meant to help you arrive prepared, not to make professional determinations.
         </p>
       </div>
+            <button
+        onClick={onOpenFunding}
+        className="w-full flex items-center justify-between gap-4"
+        style={{ marginTop: 20, padding: "14px 16px", background: C.accent, border: "none", borderRadius: 10, cursor: "pointer" }}
+      >
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: "#fff" }}>Next: check what's covered financially</span>
+        <ChevronRight size={16} color="#fff" />
+      </button>
     </div>
   );
 }
@@ -1438,7 +1511,7 @@ function ChecklistRow({ label, note, status }) {
   );
 }
 
-function FundingChecklistView({ allData, onExit }) {
+function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContractor }) {
   const P = allData.P?.answers || {};
   const renting = P.p2 === "Rent";
   const mightHaveInsurance = P.p5 === "Yes" || P.p5 === "Not sure";
@@ -1482,6 +1555,29 @@ function FundingChecklistView({ allData, onExit }) {
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: C.inkSoft, lineHeight: 1.6 }}>
           AccessPath doesn't guarantee insurance coverage, grant approval, or financing — those need confirmation through the relevant provider or program. This checklist just tracks what you've covered so far.
         </p>
+      </div>
+            <div style={{ marginTop: 24 }}>
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.inkSoft, marginBottom: 12 }}>
+          You've now reviewed all three deliverables. Revisit any of them anytime:
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onOpenPriority}
+            className="w-full flex items-center justify-between gap-4 text-left"
+            style={{ padding: "12px 16px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+          >
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>Accessibility Priority Plan</span>
+            <ChevronRight size={16} color={C.accent} />
+          </button>
+          <button
+            onClick={onOpenContractor}
+            className="w-full flex items-center justify-between gap-4 text-left"
+            style={{ padding: "12px 16px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+          >
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>Contractor Preparation Package</span>
+            <ChevronRight size={16} color={C.accent} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1689,6 +1785,7 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
   const [showFunding, setShowFunding] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   const [currentPlan, setCurrentPlan] = useState("free");
 
@@ -1775,9 +1872,10 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
       {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onStartCheckout={handleStartCheckout} onExit={() => setShowPricing(false)} />}
       {!showPricing && showPrivacy && <PrivacyPolicyView onExit={() => setShowPrivacy(false)} />}
 {!showPricing && !showPrivacy && showTerms && <TermsOfServiceView onExit={() => setShowTerms(false)} />}  
-      {!showPricing && showPriority && <PriorityPlanView allData={allData} onExit={() => setShowPriority(false)} />}
-      {!showPricing && showContractor && <ContractorPackageView allData={allData} onExit={() => setShowContractor(false)} />}
-      {!showPricing && showFunding && <FundingChecklistView allData={allData} onExit={() => setShowFunding(false)} />}
+     {!showPricing && showCompletion && <CompletionView allData={allData} currentPlan={currentPlan} onExit={() => setShowCompletion(false)} onOpenPriority={() => { setShowCompletion(false); setShowPriority(true); }} onOpenContractor={() => { setShowCompletion(false); setShowContractor(true); }} onOpenFunding={() => { setShowCompletion(false); setShowFunding(true); }} onOpenPricing={() => { setShowCompletion(false); setShowPricing(true); }} />}
+      {!showPricing && showPriority && <PriorityPlanView allData={allData} onExit={() => setShowPriority(false)} onOpenContractor={() => { setShowPriority(false); setShowContractor(true); }} />}
+      {!showPricing && showContractor && <ContractorPackageView allData={allData} onExit={() => setShowContractor(false)} onOpenFunding={() => { setShowContractor(false); setShowFunding(true); }} />}
+      {!showPricing && showFunding && <FundingChecklistView allData={allData} onExit={() => setShowFunding(false)} onOpenPriority={() => { setShowFunding(false); setShowPriority(true); }} onOpenContractor={() => { setShowFunding(false); setShowContractor(true); }} />}
       {!showPricing && !showPriority && !showContractor && !showFunding && showProfile && (
         <ProfileView
           allData={allData}
@@ -1807,7 +1905,7 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
   data={allData[activeSection.id]}
   onExit={() => setActiveId(null)}
   onSave={(next) => handleSave(activeSection.id, next)}
-  onFinish={() => { setActiveId(null); setShowProfile(true); }}
+  onFinish={() => { setActiveId(null); if (overallPct === 100) { setShowCompletion(true); } else { setShowProfile(true); } }}
 />
       )}
       {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && activeSection && !activeSection.builtOut && (
