@@ -466,7 +466,8 @@ function isSectionLocked(sectionId, planId) {
 /* ---------------------------------------------------------------
    Storage helpers
 ----------------------------------------------------------------*/
-const keyFor = (id) => `accesspath:section:${id}`;
+let currentProfileId = "default";
+const keyFor = (id) => `accesspath:profile:${currentProfileId}:section:${id}`;
 
 async function loadSection(id) {
   try {
@@ -474,6 +475,18 @@ async function loadSection(id) {
     if (res && res.value) return JSON.parse(res.value);
   } catch (e) {
     /* not stored yet */
+  }
+  if (currentProfileId === "default") {
+    try {
+      const oldRes = await window.storage.get(`accesspath:section:${id}`);
+      if (oldRes && oldRes.value) {
+        const parsed = JSON.parse(oldRes.value);
+        window.storage.set(keyFor(id), oldRes.value).catch(() => {});
+        return parsed;
+      }
+    } catch (e) {
+      /* no old data either */
+    }
   }
   return { status: "not_started", answers: {}, lastIndex: 0 };
 }
@@ -993,6 +1006,56 @@ function ProfilePanel({ title, subtitle, children }) {
   );
 }
 
+function ProfileSwitcherView({ profiles, activeProfileId, onSelect, onCreate }) {
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const handleCreate = () => {
+    if (newName.trim() === "") return;
+    onCreate(newName.trim());
+    setNewName("");
+    setCreating(false);
+  };
+
+  return (
+    <div className="max-w-xl mx-auto px-6 py-14">
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, color: C.ink, fontWeight: 600, marginBottom: 20 }}>
+        Your profiles
+      </h1>
+      <div className="flex flex-col gap-2 mb-6">
+        {profiles.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onSelect(p.id)}
+            className="w-full flex items-center justify-between gap-4 text-left"
+            style={{ padding: "14px 16px", background: p.id === activeProfileId ? C.accent : C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+          >
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 600, color: p.id === activeProfileId ? "#fff" : C.ink }}>{p.name}</span>
+            {p.id === activeProfileId && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: "#fff" }}>Active</span>}
+          </button>
+        ))}
+      </div>
+
+      {creating ? (
+        <div className="flex flex-col gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Profile name (e.g. a client's name)"
+            style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.line}`, fontFamily: "'Inter', sans-serif", fontSize: 14 }}
+          />
+          <div className="flex gap-2">
+            <button onClick={handleCreate} style={{ padding: "10px 16px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Create</button>
+            <button onClick={() => setCreating(false)} style={{ padding: "10px 16px", background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setCreating(true)} style={{ padding: "10px 16px", background: "none", border: `1px dashed ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>+ New Profile</button>
+      )}
+    </div>
+  );
+}
 function CompletionView({ allData, currentPlan, onExit, onOpenPriority, onOpenContractor, onOpenFunding, onOpenPricing }) {
   const safetyItems = collectSafetyItems(allData);
   const completedCount = SECTIONS.filter((s) => allData[s.id]?.status === "completed").length;
@@ -1586,7 +1649,7 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
 /* ---------------------------------------------------------------
    Dashboard
 ----------------------------------------------------------------*/
-function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, currentPlan }) {
+function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, currentPlan }) {
   const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
   return (
     <div className="max-w-2xl mx-auto px-6 py-14">
@@ -1622,6 +1685,13 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenPricing, onOpenPrivac
             style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 12px", color: C.inkSoft, fontFamily: "'Inter', sans-serif", fontSize: 13, cursor: "pointer" }}
           >
             <FileText size={14} /> Profile
+          </button>
+                    <button
+            onClick={onOpenProfileSwitcher}
+            className="flex items-center gap-1.5"
+            style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 12px", color: C.inkSoft, fontFamily: "'Inter', sans-serif", fontSize: 13, cursor: "pointer" }}
+          >
+            Switch Profile
           </button>
         </div>
       </div>
@@ -1786,11 +1856,26 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
-
+const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("free");
+  const [profiles, setProfiles] = useState([{ id: "default", name: "My Profile" }]);
+const [activeProfileId, setActiveProfileId] = useState("default");
+const handleCreateProfile = (name) => {
+    const newProfile = { id: `p${Date.now()}`, name };
+    const updated = [...profiles, newProfile];
+    setProfiles(updated);
+    window.storage.set("accesspath:profiles", JSON.stringify(updated)).catch(() => {});
+    setActiveProfileId(newProfile.id);
+    setShowProfileSwitcher(false);
+  };
 
+  const handleSelectProfile = (id) => {
+    setActiveProfileId(id);
+    setShowProfileSwitcher(false);
+  };
   useEffect(() => {
     (async () => {
+      currentProfileId = activeProfileId;
       const entries = await Promise.all(SECTIONS.map(async (s) => [s.id, await loadSection(s.id)]));
       setAllData(Object.fromEntries(entries));
       const checkoutStatus = new URLSearchParams(window.location.search).get("checkout");
@@ -1815,8 +1900,20 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
         window.history.replaceState({}, "", window.location.pathname);
       }
     })();
+  }, [activeProfileId]);
+useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("accesspath:profiles");
+        if (res && res.value) {
+          const saved = JSON.parse(res.value);
+          if (Array.isArray(saved) && saved.length > 0) setProfiles(saved);
+        }
+      } catch (e) {
+        /* no saved profiles yet — keep default */
+      }
+    })();
   }, []);
-
   const handleSelectPlan = async (planId) => {
     setCurrentPlan(planId);
     try {
@@ -1872,6 +1969,7 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
       {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onStartCheckout={handleStartCheckout} onExit={() => setShowPricing(false)} />}
       {!showPricing && showPrivacy && <PrivacyPolicyView onExit={() => setShowPrivacy(false)} />}
 {!showPricing && !showPrivacy && showTerms && <TermsOfServiceView onExit={() => setShowTerms(false)} />}  
+     {!showPricing && showProfileSwitcher && <ProfileSwitcherView profiles={profiles} activeProfileId={activeProfileId} onSelect={handleSelectProfile} onCreate={handleCreateProfile} />}
      {!showPricing && showCompletion && <CompletionView allData={allData} currentPlan={currentPlan} onExit={() => setShowCompletion(false)} onOpenPriority={() => { setShowCompletion(false); setShowPriority(true); }} onOpenContractor={() => { setShowCompletion(false); setShowContractor(true); }} onOpenFunding={() => { setShowCompletion(false); setShowFunding(true); }} onOpenPricing={() => { setShowCompletion(false); setShowPricing(true); }} />}
       {!showPricing && showPriority && <PriorityPlanView allData={allData} onExit={() => setShowPriority(false)} onOpenContractor={() => { setShowPriority(false); setShowContractor(true); }} />}
       {!showPricing && showContractor && <ContractorPackageView allData={allData} onExit={() => setShowContractor(false)} onOpenFunding={() => { setShowContractor(false); setShowFunding(true); }} />}
@@ -1892,6 +1990,7 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
           allData={allData}
           onOpen={setActiveId}
           onOpenProfile={() => setShowProfile(true)}
+          onOpenProfileSwitcher={() => setShowProfileSwitcher(true)}
           onOpenPricing={() => setShowPricing(true)}
           onOpenPrivacy={() => setShowPrivacy(true)}
         onOpenTerms={() => setShowTerms(true)}
