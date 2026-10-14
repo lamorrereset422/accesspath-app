@@ -1714,7 +1714,7 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
 /* ---------------------------------------------------------------
    Dashboard
 ----------------------------------------------------------------*/
-function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, loadErrors, currentPlan }) {
+function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, loadErrors, currentPlan, activeProfileName }) {
     const hasLoadError = !!loadErrors && Object.keys(loadErrors).length > 0;
       const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
   return (
@@ -1762,6 +1762,7 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOp
         </div>
       </div>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, color: C.ink, fontWeight: 600, marginBottom: 8 }}>Plan a Safer, More Accessible Home</h1>
+         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: C.ink, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "inline-block" }}>Currently viewing: <strong>{activeProfileName}</strong></p>
       <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, color: C.inkSoft, lineHeight: 1.6, marginBottom: 30 }}>
         Your home assessment, in your own words — sixteen sections, one question at a time. Leave any time; nothing is lost.
       </p>
@@ -2111,6 +2112,7 @@ const loadProfileList = async () => {
 
   const overallPct = Math.round(SECTIONS.reduce((sum, s) => sum + sectionPercent(s, allData[s.id]), 0) / SECTIONS.length);
   const activeSection = SECTIONS.find((s) => s.id === activeId);
+     const activeProfileName = profiles.find((p) => p.id === activeProfileId)?.name || "Unknown profile";
 
   return (
     <div style={{ background: C.bg, minHeight: 500, fontFamily: "'Inter', sans-serif" }}>
@@ -2141,6 +2143,7 @@ const loadProfileList = async () => {
          onOpen={(id) => (loadErrors[id] ? retryLoad() : setActiveId(id))}
           onOpenProfile={() => setShowProfile(true)}
           onOpenProfileSwitcher={() => setShowProfileSwitcher(true)}
+             activeProfileName={activeProfileName}
           onOpenPricing={() => setShowPricing(true)}
           onOpenPrivacy={() => setShowPrivacy(true)}
         onOpenTerms={() => setShowTerms(true)}
