@@ -21,7 +21,11 @@ export function installSupabaseStorage() {
         .eq("key", key)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error(`No value found for "${key}"`);
+      if (!data) {
+        const notFound = new Error(`No value found for "${key}"`);
+        notFound.code = "NOT_FOUND";
+        throw notFound;
+      }
       return { key, value: data.value, shared: false };
     },
 
