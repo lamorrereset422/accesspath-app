@@ -469,26 +469,54 @@ function isSectionLocked(sectionId, planId) {
 let currentProfileId = "default";
 const keyFor = (id) => `accesspath:profile:${currentProfileId}:section:${id}`;
 
-async function loadSection(id) {
-  try {
-    const res = await window.storage.get(keyFor(id));
-    if (res && res.value) return JSON.parse(res.value);
-  } catch (e) {
-    /* not stored yet */
+function isNotFound(e) {
+  return !!e && e.code === "NOT_FOUND";
+}
+
+function parseSection(value) {
+  const parsed = JSON.parse(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Saved section data is not readable");
   }
-  if (currentProfileId === "default") {
+  return parsed;
+}
+
+async function loadSection(id, profileId) {
+  const newKey = `accesspath:profile:${profileId}:section:${id}`;
+  try {
+    const res = await window.storage.get(newKey);
+    return parseSection(res.value);
+  } catch (e) {
+    if (!isNotFound(e)) throw e;
+  }
+  if (profileId === "default") {
     try {
       const oldRes = await window.storage.get(`accesspath:section:${id}`);
-      if (oldRes && oldRes.value) {
-        const parsed = JSON.parse(oldRes.value);
-        window.storage.set(keyFor(id), oldRes.value).catch(() => {});
-        return parsed;
-      }
+      const parsed = parseSection(oldRes.value);
+      window.storage.set(newKey, oldRes.value).catch(() => {});
+      return parsed;
     } catch (e) {
-      /* no old data either */
+      if (!isNotFound(e)) throw e;
     }
   }
   return { status: "not_started", answers: {}, lastIndex: 0 };
+}
+
+async function loadSections(profileId, previous, ids) {
+  return Promise.all(
+    ids.map(async (id) => {
+      try {
+        return { id, data: await loadSection(id, profileId), failed: false };
+      } catch (e) {
+        console.error("AccessPath: failed to load section", id, e);
+        const prev = previous && previous[id];
+        const data = prev && !prev.loadFailed
+          ? prev
+          : { status: "not_started", answers: {}, lastIndex: 0, loadFailed: true };
+        return { id, data, failed: true };
+      }
+    })
+  );
 }
 
 async function saveSection(id, data) {
@@ -1006,15 +1034,21 @@ function ProfilePanel({ title, subtitle, children }) {
   );
 }
 
-function ProfileSwitcherView({ profiles, activeProfileId, onSelect, onCreate }) {
+function ProfileSwitcherView({ profiles, activeProfileId, profilesStatus, onRetryProfiles, onSelect, onCreate }) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  const handleCreate = () => {
-    if (newName.trim() === "") return;
-    onCreate(newName.trim());
-    setNewName("");
-    setCreating(false);
+  const handleCreate = async () => {
+    if (busy || newName.trim() === "") return;
+    setBusy(true);
+    setCreateError("");
+    const ok = await onCreate(newName.trim());
+    if (!ok) {
+      setBusy(false);
+      setCreateError("Your new profile could not be saved. Nothing was changed. Please try again.");
+    }
   };
 
   return (
@@ -1022,40 +1056,71 @@ function ProfileSwitcherView({ profiles, activeProfileId, onSelect, onCreate }) 
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, color: C.ink, fontWeight: 600, marginBottom: 20 }}>
         Your profiles
       </h1>
-      <div className="flex flex-col gap-2 mb-6">
-        {profiles.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onSelect(p.id)}
-            className="w-full flex items-center justify-between gap-4 text-left"
-            style={{ padding: "14px 16px", background: p.id === activeProfileId ? C.accent : C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
-          >
-            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 600, color: p.id === activeProfileId ? "#fff" : C.ink }}>{p.name}</span>
-            {p.id === activeProfileId && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: "#fff" }}>Active</span>}
-          </button>
-        ))}
-      </div>
 
-      {creating ? (
-        <div className="flex flex-col gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Profile name (e.g. a client's name)"
-            style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.line}`, fontFamily: "'Inter', sans-serif", fontSize: 14 }}
-          />
-          <div className="flex gap-2">
-            <button onClick={handleCreate} style={{ padding: "10px 16px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Create</button>
-            <button onClick={() => setCreating(false)} style={{ padding: "10px 16px", background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setCreating(true)} style={{ padding: "10px 16px", background: "none", border: `1px dashed ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>+ New Profile</button>
+      {profilesStatus === "loading" && (
+        <p role="status" style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: C.inkFaint, marginBottom: 20 }}>
+          Loading your profiles…
+        </p>
       )}
+
+      {profilesStatus === "error" && (
+        <div role="alert" style={{ background: C.panel, border: `1px solid ${C.alert}`, borderLeft: `6px solid ${C.alert}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20, fontFamily: "'Inter', sans-serif" }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: C.ink, marginBottom: 4 }}>Warning: your profiles could not be loaded.</p>
+          <p style={{ fontSize: 13.5, color: C.inkSoft, lineHeight: 1.5, marginBottom: 10 }}>Your saved profiles have not been changed. Creating a new profile is paused until they load.</p>
+          <button type="button" onClick={onRetryProfiles} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", minHeight: 44, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Retry</button>
+        </div>
+      )}
+
+      {profilesStatus === "ready" && (
+        <>
+          <div className="flex flex-col gap-2 mb-6">
+            {profiles.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p.id)}
+                className="w-full flex items-center justify-between gap-4 text-left"
+                style={{ padding: "14px 16px", background: p.id === activeProfileId ? C.accent : C.panel, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer" }}
+              >
+                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 600, color: p.id === activeProfileId ? "#fff" : C.ink }}>{p.name}</span>
+                {p.id === activeProfileId && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: "#fff" }}>Active</span>}
+              </button>
+            ))}
+          </div>
+
+          {creating ? (
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                aria-label="Profile name"
+                value={newName}
+                disabled={busy}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Profile name (e.g. a client's name)"
+                style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.line}`, fontFamily: "'Inter', sans-serif", fontSize: 14 }}
+              />
+              {createError && (
+                <p role="alert" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.alert }}>{createError}</p>
+              )}
+              <div className="flex gap-2">
+                <button onClick={handleCreate} disabled={busy} style={{ padding: "10px 16px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "Creating…" : "Create"}</button>
+                <button onClick={() => { setCreating(false); setCreateError(""); }} disabled={busy} style={{ padding: "10px 16px", background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setCreating(true)} style={{ padding: "10px 16px", background: "none", border: `1px dashed ${C.line}`, color: C.inkSoft, borderRadius: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer" }}>+ New Profile</button>
+          )}
+        </>
+      )}
+
+      <div style={{ marginTop: 24 }}>
+        <button type="button" onClick={() => onSelect(activeProfileId)} style={{ background: "none", border: "none", color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, cursor: "pointer", textDecoration: "underline", minHeight: 44 }}>
+          Back to your assessment
+        </button>
+      </div>
     </div>
   );
 }
+
 function CompletionView({ allData, currentPlan, onExit, onOpenPriority, onOpenContractor, onOpenFunding, onOpenPricing }) {
   const safetyItems = collectSafetyItems(allData);
   const completedCount = SECTIONS.filter((s) => allData[s.id]?.status === "completed").length;
@@ -1649,8 +1714,9 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
 /* ---------------------------------------------------------------
    Dashboard
 ----------------------------------------------------------------*/
-function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, currentPlan }) {
-  const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
+function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, loadErrors, currentPlan, activeProfileName }) {
+    const hasLoadError = !!loadErrors && Object.keys(loadErrors).length > 0;
+      const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
   return (
     <div className="max-w-2xl mx-auto px-6 py-14">
       <div aria-live="polite" className="sr-only">AccessPath home dashboard</div>
@@ -1696,15 +1762,16 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOp
         </div>
       </div>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, color: C.ink, fontWeight: 600, marginBottom: 8 }}>Plan a Safer, More Accessible Home</h1>
+         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: C.ink, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "inline-block" }}>Currently viewing: <strong>{activeProfileName}</strong></p>
       <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, color: C.inkSoft, lineHeight: 1.6, marginBottom: 30 }}>
         Your home assessment, in your own words — sixteen sections, one question at a time. Leave any time; nothing is lost.
       </p>
 
       <div className="flex items-center justify-between mb-2">
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: C.inkSoft, fontWeight: 500 }}>Overall progress</p>
-        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: C.accent }}>{overallPct}%</p>
+                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: C.accent }}>{hasLoadError ? "—" : `${overallPct}%`}</p>
       </div>
-      <div className="mb-10"><ProgressBar pct={overallPct} height={8} /></div>
+            {hasLoadError ? <p role="status" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.inkSoft, marginBottom: 40 }}>Progress is unavailable until every section loads.</p> : <div className="mb-10"><ProgressBar pct={overallPct} height={8} /></div>}
 
       <div className="flex flex-col gap-2">
         {SECTIONS.map((s) => {
@@ -1725,11 +1792,11 @@ function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOp
                   {!s.builtOut && !locked && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: C.inkFaint, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 6px" }}>preview</span>}
                 </div>
                 <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.inkFaint, marginBottom: 6 }}>{s.desc}</p>
-                {!locked && <ProgressBar pct={pct} height={4} color={data.status === "not_applicable" ? C.inkFaint : C.accent} />}
+                               {!locked && !data.loadFailed && <ProgressBar pct={pct} height={4} color={data.status === "not_applicable" ? C.inkFaint : C.accent} />}
               </div>
               <div className="flex flex-col items-end gap-1" style={{ flexShrink: 0 }}>
                 {locked ? <Lock size={18} color={C.inkFaint} /> : <s.Icon size={18} color={C.inkFaint} />}
-                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: C.inkFaint }}>{locked ? "Upgrade to unlock" : STATUS_LABEL[data.status] || "Not started"}</p>
+                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: !locked && data.loadFailed ? C.alert : C.inkFaint }}>{locked ? "Upgrade to unlock" : data.loadFailed ? "Couldn't load, tap to retry" : STATUS_LABEL[data.status] || "Not started"}</p>
               </div>
             </button>
           );
@@ -1842,6 +1909,34 @@ function TermsOfServiceView({ onExit }) {
     </div>
   );
 }
+function LoadErrorBanner({ failedIds, retrying, onRetry }) {
+  if (!failedIds || failedIds.length === 0) return null;
+  const titles = failedIds.map((id) => {
+    const s = SECTIONS.find((x) => x.id === id);
+    return s ? s.title : id;
+  });
+  return (
+    <div
+      role="alert"
+      style={{ background: C.panel, border: `1px solid ${C.alert}`, borderLeft: `6px solid ${C.alert}`, borderRadius: 10, padding: "14px 16px", margin: 16, fontFamily: "'Inter', sans-serif" }}
+    >
+      <p style={{ fontSize: 14, fontWeight: 600, color: C.ink, marginBottom: 4 }}>
+        Warning: some of your information could not be loaded.
+      </p>
+      <p style={{ fontSize: 13.5, color: C.inkSoft, lineHeight: 1.5, marginBottom: 10 }}>
+        Could not load: {titles.join(", ")}. Your saved answers have not been changed, and editing is paused for {titles.length === 1 ? "this section" : "these sections"} until {titles.length === 1 ? "it loads" : "they load"}. If this keeps happening, try logging out and back in.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={retrying}
+        style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", minHeight: 44, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: retrying ? "default" : "pointer", opacity: retrying ? 0.7 : 1 }}
+      >
+        {retrying ? "Retrying…" : "Retry"}
+      </button>
+    </div>
+  );
+}
 /* ---------------------------------------------------------------
    Root app
 ----------------------------------------------------------------*/
@@ -1860,24 +1955,48 @@ const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("free");
   const [profiles, setProfiles] = useState([{ id: "default", name: "My Profile" }]);
 const [activeProfileId, setActiveProfileId] = useState("default");
-const handleCreateProfile = (name) => {
-    const newProfile = { id: `p${Date.now()}`, name };
-    const updated = [...profiles, newProfile];
-    setProfiles(updated);
-    window.storage.set("accesspath:profiles", JSON.stringify(updated)).catch(() => {});
-    setActiveProfileId(newProfile.id);
-    setShowProfileSwitcher(false);
-  };
-
-  const handleSelectProfile = (id) => {
+const [loadErrors, setLoadErrors] = useState({});
+const [retrying, setRetrying] = useState(false);
+const [profilesStatus, setProfilesStatus] = useState("loading"); // loading | ready | error
+const switchToProfile = (id) => {
+    if (id === activeProfileId) { setShowProfileSwitcher(false); return; }
+    currentProfileId = id;
+    setAllData(null);
+    setLoadErrors({});
+    setActiveId(null);
+    setShowProfile(false);
+    setShowPriority(false);
+    setShowContractor(false);
+    setShowFunding(false);
+    setShowCompletion(false);
     setActiveProfileId(id);
     setShowProfileSwitcher(false);
   };
+
+  const handleSelectProfile = (id) => switchToProfile(id);
+
+  const handleCreateProfile = async (name) => {
+    if (profilesStatus !== "ready") return false;
+    const newProfile = { id: `p${Date.now()}`, name };
+    const updated = [...profiles, newProfile];
+    try {
+      await window.storage.set("accesspath:profiles", JSON.stringify(updated));
+    } catch (e) {
+      console.error("AccessPath: failed to save profile list", e);
+      return false;
+    }
+    setProfiles(updated);
+    switchToProfile(newProfile.id);
+    return true;
+  };
   useEffect(() => {
+        let cancelled = false;
     (async () => {
       currentProfileId = activeProfileId;
-      const entries = await Promise.all(SECTIONS.map(async (s) => [s.id, await loadSection(s.id)]));
-      setAllData(Object.fromEntries(entries));
+         const results = await loadSections(activeProfileId, null, SECTIONS.map((s) => s.id));
+      if (cancelled) return;
+      setAllData(Object.fromEntries(results.map((r) => [r.id, r.data])));
+      setLoadErrors(Object.fromEntries(results.filter((r) => r.failed).map((r) => [r.id, true])));
       const checkoutStatus = new URLSearchParams(window.location.search).get("checkout");
       const attempts = checkoutStatus === "success" ? 6 : 1;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -1900,20 +2019,50 @@ const handleCreateProfile = (name) => {
         window.history.replaceState({}, "", window.location.pathname);
       }
     })();
+        return () => { cancelled = true; };
   }, [activeProfileId]);
-useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("accesspath:profiles");
-        if (res && res.value) {
-          const saved = JSON.parse(res.value);
-          if (Array.isArray(saved) && saved.length > 0) setProfiles(saved);
-        }
-      } catch (e) {
-        /* no saved profiles yet — keep default */
+const loadProfileList = async () => {
+    setProfilesStatus("loading");
+    try {
+      const res = await window.storage.get("accesspath:profiles");
+      const saved = JSON.parse(res.value);
+      if (!Array.isArray(saved) || saved.length === 0 ||
+          saved.some((p) => !p || typeof p.id !== "string" || typeof p.name !== "string")) {
+        throw new Error("Saved profile list is not readable");
       }
-    })();
-  }, []);
+      setProfiles(saved);
+      setProfilesStatus("ready");
+    } catch (e) {
+      if (isNotFound(e)) { setProfilesStatus("ready"); return; }
+      console.error("AccessPath: failed to load profile list", e);
+      setProfilesStatus("error");
+    }
+  };
+  useEffect(() => { loadProfileList(); }, []);
+    const retryLoad = async () => {
+    if (retrying || !allData) return;
+    setRetrying(true);
+    try {
+      const profileId = activeProfileId;
+      const results = await loadSections(profileId, allData, Object.keys(loadErrors));
+      if (profileId !== currentProfileId) return;
+      setAllData((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev };
+        results.forEach((r) => { if (!r.failed) next[r.id] = r.data; });
+        return next;
+      });
+      setLoadErrors((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => { if (!r.failed) delete next[r.id]; });
+        return next;
+      });
+    } catch (e) {
+      console.error("AccessPath: retry failed", e);
+    } finally {
+      setRetrying(false);
+    }
+  };
   const handleSelectPlan = async (planId) => {
     setCurrentPlan(planId);
     try {
@@ -1948,6 +2097,7 @@ useEffect(() => {
   };
 
   const handleSave = (id, next) => {
+        if (loadErrors[id]) { console.error("AccessPath: save blocked, section failed to load", id); return; }
     setAllData((prev) => ({ ...prev, [id]: next }));
     saveSection(id, next);
   };
@@ -1962,14 +2112,16 @@ useEffect(() => {
 
   const overallPct = Math.round(SECTIONS.reduce((sum, s) => sum + sectionPercent(s, allData[s.id]), 0) / SECTIONS.length);
   const activeSection = SECTIONS.find((s) => s.id === activeId);
+     const activeProfileName = profiles.find((p) => p.id === activeProfileId)?.name || "Unknown profile";
 
   return (
     <div style={{ background: C.bg, minHeight: 500, fontFamily: "'Inter', sans-serif" }}>
-      <style>{FONTS}</style>
+          <style>{FONTS}</style>
+            <LoadErrorBanner failedIds={Object.keys(loadErrors)} retrying={retrying} onRetry={retryLoad} />
       {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onStartCheckout={handleStartCheckout} onExit={() => setShowPricing(false)} />}
       {!showPricing && showPrivacy && <PrivacyPolicyView onExit={() => setShowPrivacy(false)} />}
 {!showPricing && !showPrivacy && showTerms && <TermsOfServiceView onExit={() => setShowTerms(false)} />}  
-     {!showPricing && showProfileSwitcher && <ProfileSwitcherView profiles={profiles} activeProfileId={activeProfileId} onSelect={handleSelectProfile} onCreate={handleCreateProfile} />}
+     {!showPricing && showProfileSwitcher && <ProfileSwitcherView profiles={profiles} activeProfileId={activeProfileId} profilesStatus={profilesStatus} onRetryProfiles={loadProfileList} onSelect={handleSelectProfile} onCreate={handleCreateProfile} />}
      {!showPricing && showCompletion && <CompletionView allData={allData} currentPlan={currentPlan} onExit={() => setShowCompletion(false)} onOpenPriority={() => { setShowCompletion(false); setShowPriority(true); }} onOpenContractor={() => { setShowCompletion(false); setShowContractor(true); }} onOpenFunding={() => { setShowCompletion(false); setShowFunding(true); }} onOpenPricing={() => { setShowCompletion(false); setShowPricing(true); }} />}
       {!showPricing && showPriority && <PriorityPlanView allData={allData} onExit={() => setShowPriority(false)} onOpenContractor={() => { setShowPriority(false); setShowContractor(true); }} />}
       {!showPricing && showContractor && <ContractorPackageView allData={allData} onExit={() => setShowContractor(false)} onOpenFunding={() => { setShowContractor(false); setShowFunding(true); }} />}
@@ -1988,13 +2140,15 @@ useEffect(() => {
       {!showPricing && !showPriority && !showContractor && !showFunding && !showPrivacy && !showTerms && !showProfile && !activeSection && (
         <Dashboard
           allData={allData}
-          onOpen={setActiveId}
+         onOpen={(id) => (loadErrors[id] ? retryLoad() : setActiveId(id))}
           onOpenProfile={() => setShowProfile(true)}
           onOpenProfileSwitcher={() => setShowProfileSwitcher(true)}
+             activeProfileName={activeProfileName}
           onOpenPricing={() => setShowPricing(true)}
           onOpenPrivacy={() => setShowPrivacy(true)}
         onOpenTerms={() => setShowTerms(true)}
           overallPct={overallPct}
+                    loadErrors={loadErrors}
           currentPlan={currentPlan}
         />
       )}
