@@ -9,30 +9,39 @@ import { installSupabaseStorage } from "./supabaseStorage.js";
 /* ---------------------------------------------------------------
    Password recovery helpers
    The recovery gate turns on ONLY from Supabase's PASSWORD_RECOVERY
-   event or a session Supabase itself marked as a recovery sign-in.
-   The ?reset=1 marker never turns it on by itself.
+   event. The ?reset=1 marker never turns it on by itself.
+   The flag lives in localStorage, the same place the login session
+   lives, so every tab that can use the recovery session is gated.
+   It stores only the user's ID, never a token or password.
 ----------------------------------------------------------------*/
 const RECOVERY_FLAG = "accesspath:recovery-pending";
+let memoryRecoveryUserId = null; // backup only if browser storage is unavailable
 
-function readRecoveryFlag() {
-  try { return window.sessionStorage.getItem(RECOVERY_FLAG) === "1"; } catch { return false; }
+function readRecoveryUserId() {
+  try {
+    const raw = window.localStorage.getItem(RECOVERY_FLAG);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed.userId === "string") return parsed.userId;
+  } catch { /* fall back to memory */ }
+  return memoryRecoveryUserId;
 }
-function setRecoveryFlag() {
-  try { window.sessionStorage.setItem(RECOVERY_FLAG, "1"); } catch { /* storage unavailable */ }
+function setRecoveryFlag(userId) {
+  if (!userId) return;
+  try {
+    window.localStorage.setItem(RECOVERY_FLAG, JSON.stringify({ userId }));
+    memoryRecoveryUserId = null;
+  } catch {
+    memoryRecoveryUserId = userId;
+  }
 }
 function clearRecoveryFlag() {
-  try { window.sessionStorage.removeItem(RECOVERY_FLAG); } catch { /* storage unavailable */ }
+  memoryRecoveryUserId = null;
+  try { window.localStorage.removeItem(RECOVERY_FLAG); } catch { /* ignore */ }
+  try { window.sessionStorage.removeItem(RECOVERY_FLAG); } catch { /* remove the old per-tab flag too */ }
 }
-
-// True only when Supabase marked this session as a password-recovery sign-in.
-function isRecoverySession(session) {
-  try {
-    const part = session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const claims = JSON.parse(window.atob(part));
-    return Array.isArray(claims.amr) && claims.amr.some((entry) => entry && entry.method === "recovery");
-  } catch {
-    return false;
-  }
+function isRecoveryFor(session) {
+  const userId = readRecoveryUserId();
+  return !!(session && session.user && userId && session.user.id === userId);
 }
 
 // Read the link details once, when the page first loads.
@@ -52,13 +61,13 @@ function cleanLinkDetailsFromUrl() {
 }
 
 // Listen from the very start so the PASSWORD_RECOVERY event can't be missed.
-supabase.auth.onAuthStateChange((event) => {
-  if (event === "PASSWORD_RECOVERY") setRecoveryFlag();
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === "PASSWORD_RECOVERY" && session && session.user) setRecoveryFlag(session.user.id);
 });
 
 function Root() {
   const [session, setSession] = useState(undefined); // undefined = still checking
-  const [recovery, setRecovery] = useState(readRecoveryFlag);
+  const [, setFlagVersion] = useState(0); // re-check the shared flag when it changes
   const [leaving, setLeaving] = useState(false);
   const [waitForRecovery, setWaitForRecovery] = useState(cameFromResetLink && !linkError);
   const [notice, setNotice] = useState(() =>
@@ -72,14 +81,21 @@ function Root() {
       : null
   );
 
+  const recovery = isRecoveryFor(session);
+  const refreshFlag = () => setFlagVersion((v) => v + 1);
+
   useEffect(() => {
     const applySession = (event, nextSession) => {
-      if (event === "PASSWORD_RECOVERY" || (nextSession && isRecoverySession(nextSession))) {
-        setRecoveryFlag();
+      if (event === "PASSWORD_RECOVERY" && nextSession && nextSession.user) {
+        setRecoveryFlag(nextSession.user.id);
+      } else if (nextSession && nextSession.user) {
+        const flaggedUserId = readRecoveryUserId();
+        // A leftover flag for a different account is never valid.
+        if (flaggedUserId && flaggedUserId !== nextSession.user.id) clearRecoveryFlag();
       }
       if (nextSession) setNotice(null);
-      setRecovery(readRecoveryFlag());
       setSession(nextSession);
+      refreshFlag();
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -94,6 +110,15 @@ function Root() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Another tab started or finished recovery: re-check right away.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === RECOVERY_FLAG || e.key === null) refreshFlag();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // A reset link should become a recovery session within a moment. Wait briefly
   // instead of opening the assessment. This only delays; it never turns the gate on.
   useEffect(() => {
@@ -103,34 +128,36 @@ function Root() {
     return () => clearTimeout(timer);
   }, [waitForRecovery, session, recovery]);
 
-  // If the recovery session disappears (expired or signed out elsewhere), end recovery safely.
+  // If the session disappears while recovery is pending, end recovery safely.
   useEffect(() => {
-    if (session === null && recovery && !leaving) {
+    if (session === null && !leaving && readRecoveryUserId()) {
       clearRecoveryFlag();
-      setRecovery(false);
-      setNotice({ type: "error", text: "Your password reset session ended. Please request a new reset link." });
+      refreshFlag();
+      setNotice({ type: "error", text: "Your password reset session has ended. If you still need to reset your password, request a new link." });
     }
-  }, [session, recovery, leaving]);
+  }, [session, leaving]);
 
-  // Finish or cancel recovery: sign out everywhere, then show the sign-in screen.
+  // Finish or cancel recovery: sign out everywhere, and only then clear the flag.
   const leaveRecovery = async (nextNotice) => {
     setLeaving(true);
-    clearRecoveryFlag();
-    setRecovery(false);
     try {
       const { error } = await supabase.auth.signOut({ scope: "global" });
       if (error) await supabase.auth.signOut({ scope: "local" });
     } catch {
       try { await supabase.auth.signOut({ scope: "local" }); } catch { /* checked below */ }
     }
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      // Sign-out did not finish: stay locked on the recovery screen.
-      setRecoveryFlag();
-      setRecovery(true);
+    let stillSignedIn = true;
+    try {
+      const { data } = await supabase.auth.getSession();
+      stillSignedIn = !!data.session;
+    } catch { /* treat as still signed in */ }
+    if (stillSignedIn) {
+      // Sign-out did not finish: the flag stays, so every tab stays locked.
       setLeaving(false);
       return;
     }
+    clearRecoveryFlag();
+    refreshFlag();
     setNotice(nextNotice);
     setLeaving(false);
   };
