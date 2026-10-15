@@ -1,12 +1,21 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient.js";
+import { ForgotPasswordForm } from "./PasswordRecovery.jsx";
 
-export default function AuthScreen() {
+export default function AuthScreen({ notice }) {
   const [mode, setMode] = useState("signIn"); // "signIn" or "signUp"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [shownNotice, setShownNotice] = useState(null);
+
+// Show notices (like "password changed") a moment after the screen appears,
+// so screen readers announce them.
+useEffect(() => {
+  const timer = setTimeout(() => setShownNotice(notice || null), 150);
+  return () => clearTimeout(timer);
+}, [notice]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,6 +38,14 @@ export default function AuthScreen() {
     }
     setLoading(false);
   };
+  if (mode === "forgot") {
+  return (
+    <div style={{ maxWidth: 380, margin: "80px auto", padding: "0 24px", fontFamily: "sans-serif" }}>
+      <h1 style={{ fontSize: 28, marginBottom: 16 }}>AccessPath</h1>
+      <ForgotPasswordForm onBack={() => { setMode("signIn"); setMessage(""); }} />
+    </div>
+  );
+}
 
   return (
     <div style={{ maxWidth: 380, margin: "80px auto", padding: "0 24px", fontFamily: "sans-serif" }}>
@@ -36,6 +53,16 @@ export default function AuthScreen() {
       <p style={{ color: "#666", marginBottom: 24 }}>
         {mode === "signUp" ? "Create an account to save your assessment." : "Sign in to continue your assessment."}
       </p>
+      <div role="status" aria-live="polite">
+  {mode === "signIn" && shownNotice && shownNotice.type === "success" && (
+    <p style={{ margin: "0 0 16px", padding: "10px 12px", border: "1px solid #3D6B5C", borderRadius: 6, color: "#1F2933" }}>{shownNotice.text}</p>
+  )}
+</div>
+<div role="alert">
+  {mode === "signIn" && shownNotice && shownNotice.type === "error" && (
+    <p style={{ margin: "0 0 16px", padding: "10px 12px", border: "2px solid #9C4636", borderRadius: 6, color: "#9C4636", fontWeight: 600 }}>{shownNotice.text}</p>
+  )}
+</div>
       <form onSubmit={handleSubmit}>
         <input
           type="email"
@@ -63,6 +90,17 @@ export default function AuthScreen() {
         </button>
       </form>
       {message && <p style={{ marginTop: 12, color: "#9C4636" }}>{message}</p>}
+      {mode === "signIn" && (
+  <div>
+    <button
+      type="button"
+      onClick={() => { setMode("forgot"); setMessage(""); }}
+      style={{ marginTop: 12, background: "none", border: "none", padding: 4, color: "#3D6B5C", fontSize: 15, cursor: "pointer", textDecoration: "underline" }}
+    >
+      Forgot password?
+    </button>
+  </div>
+)}
       <button
         onClick={() => { setMode(mode === "signUp" ? "signIn" : "signUp"); setMessage(""); }}
         style={{ marginTop: 16, background: "none", border: "none", color: "#3D6B5C", cursor: "pointer", textDecoration: "underline" }}
