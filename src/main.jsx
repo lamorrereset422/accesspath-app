@@ -5,6 +5,7 @@ import AuthScreen from "./AuthScreen.jsx";
 import { ResetPasswordScreen } from "./PasswordRecovery.jsx";
 import { supabase } from "./supabaseClient.js";
 import { installSupabaseStorage } from "./supabaseStorage.js";
+   import ErrorBoundary, { DevCrashSwitch } from "./ErrorBoundary.jsx";
 
 /* ---------------------------------------------------------------
    Password recovery helpers
@@ -202,6 +203,9 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
+       <ErrorBoundary>
+     <DevCrashSwitch />
     <Root />
+       </ErrorBoundary>
   </React.StrictMode>
 );
