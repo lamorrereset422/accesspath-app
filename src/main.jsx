@@ -6,6 +6,9 @@ import { ResetPasswordScreen } from "./PasswordRecovery.jsx";
 import { supabase } from "./supabaseClient.js";
 import { installSupabaseStorage } from "./supabaseStorage.js";
    import ErrorBoundary, { DevCrashSwitch } from "./ErrorBoundary.jsx";
+      import { startMonitoring, reportCrash } from "./monitoring.js";
+      // Start error reporting (live and preview sites only; never on localhost).
+   startMonitoring();
 
 /* ---------------------------------------------------------------
    Password recovery helpers
@@ -203,7 +206,7 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-       <ErrorBoundary>
+          <ErrorBoundary onError={reportCrash}>
      <DevCrashSwitch />
     <Root />
        </ErrorBoundary>
