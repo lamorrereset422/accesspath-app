@@ -1825,7 +1825,7 @@ function PrivacyPolicyView({ onExit }) {
         <ChevronLeft size={16} /> Back
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Privacy Policy</h1>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: September 4, 2026</p>
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: October 17, 2026</p>
 
       <LegalSection title="Who we are">
         AccessPath ("we," "us," "our") provides a home-accessibility planning tool. This policy explains what information we collect, how we use it, and your choices.
@@ -1840,8 +1840,11 @@ function PrivacyPolicyView({ onExit }) {
         Some of what you enter — mobility limitations, disabilities, or home safety concerns — is sensitive. We store it only to provide the service to you, never for advertising, and don't share it except as described below.
       </LegalSection>
       <LegalSection title="Who we share information with">
-        Supabase stores account and assessment data on our behalf. Stripe processes payments and receives the information necessary to complete your purchase. We may disclose information if required by law or to protect safety. We do not sell or rent your data.
+       Supabase stores account and assessment data on our behalf. Stripe processes payments and receives the information necessary to complete your purchase. Resend sends account emails, such as sign-up confirmations and password resets, and receives your email address to deliver them. We may disclose information if required by law or to protect safety. We do not sell or rent your data.
       </LegalSection>
+      <LegalSection title="Error reports">
+  If AccessPath runs into a technical error, a report is sent to our error-monitoring provider, Sentry (sentry.io), so we can find and fix the problem. A report contains technical details about the error, such as the error message and where in the app's code it happened, along with a cleaned version of the page address. We configure these reports to exclude your name, email address, IP address, assessment answers, request headers, cookies, and the query string and fragment parts of page addresses (the parts after "?" or "#").
+</LegalSection>
       <LegalSection title="Data retention & deletion">
         We keep your data as long as your account is active. You can request deletion of your account and data at any time by contacting hello.accesspath@outlook.com.
       </LegalSection>
