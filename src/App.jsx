@@ -1825,7 +1825,7 @@ function PrivacyPolicyView({ onExit }) {
         <ChevronLeft size={16} /> Back
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Privacy Policy</h1>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: October 16, 2026</p>
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: October 17, 2026</p>
 
       <LegalSection title="Who we are">
         AccessPath ("we," "us," "our") provides a home-accessibility planning tool. This policy explains what information we collect, how we use it, and your choices.
