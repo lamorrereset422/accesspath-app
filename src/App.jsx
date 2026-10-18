@@ -2050,7 +2050,7 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
   const [showCompletion, setShowCompletion] = useState(false);
 const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("free");
-    // Read the plan the server has stored. Returns a recognized plan id
+  // Read the plan the server has stored. Returns a recognized plan id
   // ("free" if none is saved yet), or null if the read itself failed.
   const readServerPlan = async () => {
     try {
