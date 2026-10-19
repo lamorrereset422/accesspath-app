@@ -1387,11 +1387,11 @@ function CheckoutNotice({ notice, onCheckAgain, onDismiss }) {
   if (notice) {
     const planName = notice.planId ? tierFor(notice.planId).name : "";
     if (notice.state === "processing") {
-      message = `Confirming your ${planName ? planName + " " : ""}purchase… This usually takes a few seconds.`;
+      message = "Checking your plan status. If you completed a payment, confirmation usually takes a few seconds.";
     } else if (notice.state === "ready") {
       message = `Your ${planName} plan is active.`;
     } else if (notice.state === "delayed") {
-      message = "Your payment is still being confirmed. This can take a few minutes. Please don't start another checkout while we confirm this purchase.";
+     message = "We haven't confirmed a purchase for this plan. If you completed a payment, confirmation may take a few minutes. Please don't start another checkout while that payment is being confirmed.";
     } else if (notice.state === "cancelled") {
       message = "Checkout was canceled. Your plan was not changed.";
     }
