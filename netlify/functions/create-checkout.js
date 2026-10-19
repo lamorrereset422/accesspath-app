@@ -90,7 +90,21 @@ exports.handler = async (event) => {
       return { statusCode: 409, body: JSON.stringify({ error: "Your current plan already includes this.", code: "already_has_plan" }) };
     }
 
-    const siteUrl = process.env.DEPLOY_PRIME_URL || process.env.URL || "https://accesspath-app.netlify.app";
+    const returnUrl = process.env.CHECKOUT_RETURN_URL;
+if (!returnUrl) {
+  throw new Error("CHECKOUT_RETURN_URL is required.");
+}
+
+const returnOrigin = new URL(returnUrl).origin;
+const allowedOrigin = IS_TEST_MODE
+  ? /^https:\/\/deploy-preview-\d+--accesspath-app\.netlify\.app$/.test(returnOrigin)
+  : returnOrigin === "https://accesspath-app.netlify.app";
+
+if (!allowedOrigin) {
+  throw new Error("Checkout return URL does not match Stripe mode.");
+}
+
+const siteUrl = returnOrigin;
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
