@@ -9,10 +9,16 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Map internal plan IDs to Stripe Price IDs.
-const PRICE_IDS = {
-  complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
-  contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
-};
+const IS_DEPLOY_PREVIEW = process.env.CONTEXT === "deploy-preview";
+const PRICE_IDS = IS_DEPLOY_PREVIEW
+  ? {
+      complete: process.env.STRIPE_TEST_PRICE_COMPLETE,
+      contractor: process.env.STRIPE_TEST_PRICE_CONTRACTOR,
+    }
+  : {
+      complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
+      contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
+    };
 
 // Tier order: free < complete < contractor. Used to refuse checkouts that
 // would not raise the user's plan.
@@ -83,7 +89,7 @@ exports.handler = async (event) => {
       return { statusCode: 409, body: JSON.stringify({ error: "Your current plan already includes this.", code: "already_has_plan" }) };
     }
 
-    const siteUrl = process.env.URL || "https://accesspath-app.netlify.app";
+    const siteUrl = process.env.DEPLOY_PRIME_URL || process.env.URL || "https://accesspath-app.netlify.app";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
