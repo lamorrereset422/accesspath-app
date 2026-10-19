@@ -9,8 +9,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Map internal plan IDs to Stripe Price IDs.
-const IS_DEPLOY_PREVIEW = process.env.CONTEXT === "deploy-preview";
-const PRICE_IDS = IS_DEPLOY_PREVIEW
+const IS_TEST_MODE = (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
+
+const PRICE_IDS = IS_TEST_MODE
   ? {
       complete: process.env.STRIPE_TEST_PRICE_COMPLETE,
       contractor: process.env.STRIPE_TEST_PRICE_CONTRACTOR,
