@@ -8,7 +8,7 @@ import {
 
 /* ---------------------------------------------------------------
    Palette + type tokens
-   bg: soft warm paper, not the default cream/terracotta combo.
+   bg: soft warm paper, not the default cream/terracotta combo.function 
    accent: grounded sage (calm, not clinical or "medical green").
    gold: warm marker color for in-progress / attention.
    alert: muted brick, used only for safety flags — never bright red.
@@ -1737,20 +1737,19 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
   const P = allData.P?.answers || {};
   const renting = P.p2 === "Rent";
   const mightHaveInsurance = P.p5 === "Yes" || P.p5 === "Not sure";
-  const hasEstimates = P.p10 && P.p10 !== "No, not yet";
+ const hasEstimates = ["Yes, one", "Yes, more than one"].includes(P.p10);
 
   const items = [
-    { label: "Landlord or property-owner permission", note: "Needed before modifying a rented home.", status: !renting ? "na" : P.p3 === "Yes" ? "done" : "todo" },
-    { label: "Insurance provider contacted", note: "Ask specifically about coverage for accessibility modifications.", status: !mightHaveInsurance ? "na" : P.p6 === "Yes" ? "done" : "todo" },
-    { label: "Medicaid or public support program checked", note: "Some programs cover home modifications tied to medical need.", status: P.p7 === "Yes" ? "done" : P.p7 === "No" ? "na" : "todo" },
-    { label: "Grant options explored", note: "Local and national accessibility grants can offset cost significantly.", status: P.p8 && P.p8.startsWith("Yes") ? "done" : "todo" },
+   { label: "Landlord or property-owner permission", note: "For rented homes, obtain permission. For other or unanswered living arrangements, clarify whether permission is needed.", status: P.p2 === "Own" ? "na" : renting && P.p3 === "Yes" ? "done" : "todo" },
+   { label: "Insurance provider contacted", note: "If insurance may apply, ask about coverage for accessibility modifications. An unanswered insurance question still needs clarification.", status: P.p5 === "No" ? "na" : mightHaveInsurance && P.p6 === "Yes" ? "done" : "todo" },
+    { label: "Public support options and coverage checked", note: P.p7 === "Yes" ? "You use a public support program. Confirm whether it can help with home modifications; your answer does not confirm coverage was checked." : "Clarify whether a public support program could help. Your answer does not confirm that options or coverage were checked.", status: "todo" },
+    { label: "Grant exploration or application started", note: "Starting this process does not mean an application is complete or funding is approved.", status: ["Yes, applying", "Yes, exploring options"].includes(P.p8) ? "done" : "todo" },
     { label: "Financing plan identified, if needed", note: "A loan or payment plan, if the project needs one.", status: P.p9 === "No" ? "na" : P.p9 === "Yes" ? "todo" : "todo" },
     { label: "Contractor estimates collected", note: "At least one detailed estimate to work from.", status: hasEstimates ? "done" : "todo" },
-    { label: "Estimates cover comparable scope", note: "So you're comparing apples to apples across bids.", status: !hasEstimates ? "na" : P.p11 === "Yes" ? "done" : "todo" },
-    { label: "Contractor credentials verified", note: "License, insurance, and accessibility-specific experience.", status: P.p12 === "Yes" ? "done" : "todo" },
-    { label: "Documentation ready for a contractor", note: "Measurements, photos, and your specific needs, organized.", status: P.p16 === "Yes, most of it" ? "done" : "todo" },
-  ];
-
+    { label: "Estimates cover comparable scope", note: "Compare the work included in each estimate. If you have not answered the estimates question, clarify that first.", status: P.p10 === "No, not yet" ? "na" : hasEstimates && P.p11 === "Yes" ? "done" : "todo" },
+    { label: "Contractor credential checks started", note: "Check license, insurance, and accessibility experience separately. A Yes answer confirms at least one check, not all three.", status: P.p12 === "Yes" ? "done" : "todo" },
+    { label: "Most contractor documentation gathered", note: "Review measurements, photos, and your needs with the contractor to identify anything still missing.", status: P.p16 === "Yes, most of it" ? "done" : "todo" },
+    ];
   const doneCount = items.filter((i) => i.status === "done").length;
   const applicableCount = items.filter((i) => i.status !== "na").length;
 
