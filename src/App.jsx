@@ -1551,7 +1551,11 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
       </p>
       {P.p18 && (
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, marginBottom: 28 }}>
-          You told us <strong>{P.p18}</strong> feels most urgent to you.
+          {P.p18 === "Not sure yet" ? (
+  "You haven't identified a first priority yet. Review the categories below to help decide where to begin."
+) : (
+  <>You told us <strong>{P.p18}</strong> feels most urgent to you.</>
+)}
         </p>
       )}
       {!P.p18 && <div style={{ marginBottom: 28 }} />}
@@ -1561,7 +1565,7 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
         color={C.alert}
         description="Flagged directly from your answers — falls, evacuation risk, or feeling unsafe."
         safetyStyleItems={safetyItems}
-        emptyText="Nothing flagged here yet — that's good news."
+        emptyText="No safety concerns were flagged from the answers provided so far. Unanswered questions may leave concerns unidentified; this does not confirm that the home is safe."
       />
       <PriorityCategory
         title="Essential Access"
@@ -1580,7 +1584,7 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
       <PriorityCategory
         title="Future Planning"
         color={C.inkFaint}
-        description="Living spaces, outdoor areas, and technology — worth planning for, less urgent right now."
+        description="Living spaces, outdoor areas, and technology — review these needs alongside your other priorities. Their urgency depends on your circumstances."
         noteStyleItems={future}
         emptyText="No specific notes yet from Sections K, L, or M."
       />
