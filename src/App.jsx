@@ -1619,7 +1619,13 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
   const questions = [];
   if (A.a13 === "Rent") questions.push("Can you help document this work in a way my landlord would need to approve it?");
   if (allData.D?.answers?.d4 === "Yes") questions.push("What ramp or lift options would fit our entrance, given the step height and available space?");
-  if (P.p4) questions.push(`Our rough budget range is ${P.p4} — what scope of work is realistic within that?`);
+ if (P.p4 === "No budget in mind yet") {
+   questions.push("Can you help estimate costs and explain options so I can establish a realistic budget?");
+} else if (P.p4 === "Prefer not to answer") {
+  questions.push("Can you provide itemized costs and scope options without requiring me to disclose a budget?");
+} else if (["Under $1,000", "$1,000–$5,000", "$5,000–$20,000", "$20,000–$50,000", "Over $50,000"].includes(P.p4)) {
+  questions.push(`Our rough budget range is ${P.p4} — what scope of work is realistic within that?`);
+}
   if (P.p13 === "Yes") questions.push("How would you sequence the work so I can keep living here during construction?");
   questions.push("Can you share references from other accessibility-focused projects?");
   questions.push("What's your estimated timeline, and what could extend it?");
@@ -1631,7 +1637,7 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 8 }}>Contractor Preparation Package</h1>
       <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14.5, color: C.inkSoft, lineHeight: 1.6, marginBottom: 28 }}>
-        Everything a contractor would ask for, gathered before they ever walk in the door.
+        A starting summary of the answers and measurements you've provided. Review missing details with your contractor before planning work.
       </p>
 
       <ProfilePanel title="Project summary">
@@ -1643,6 +1649,9 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       </ProfilePanel>
 
       <ProfilePanel title="Mobility device specifications" subtitle="From Section B">
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 12 }}>
+  Only recorded answers are shown. Missing device details or measurements have not been provided; confirm them before planning work.
+</p>
         <Row label="Device type" value={B.b1} />
         <Row label="Overall width" value={formatAnswer({ type: "measurement" }, B.b2)} />
         <Row label="Occupied width" value={formatAnswer({ type: "measurement" }, B.b3)} />
@@ -1654,6 +1663,9 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       </ProfilePanel>
 
       <ProfilePanel title="Caregiver access needs" subtitle="From Section N">
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 12 }}>
+  Only recorded answers are shown. Missing caregiver information has not been provided; it does not mean assistance or access space is unnecessary.
+</p>
         <Row label="Has a caregiver" value={N.n1} />
         <Row label="Needs full-home access" value={N.n3} />
         <Row label="Space needed to assist with physical tasks" value={N.n5} />
