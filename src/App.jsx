@@ -1617,7 +1617,7 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
   const barrierSections = collectBarrierNotes(allData, ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M"]);
 
   const questions = [];
-  if (A.a13 === "Rent") questions.push("Can you help document this work in a way my landlord would need to approve it?");
+ if (A.a13 === "Rent" || P.p2 === "Rent") questions.push("What property-owner permissions may be needed, and can you help document the proposed work for approval?");
   if (allData.D?.answers?.d4 === "Yes") questions.push("What ramp or lift options would fit our entrance, given the step height and available space?");
  if (P.p4 === "No budget in mind yet") {
    questions.push("Can you help estimate costs and explain options so I can establish a realistic budget?");
@@ -1643,7 +1643,12 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       <ProfilePanel title="Project summary">
         <Row label="This project is for" value={A.a2} />
         <Row label="Overall goal" value={A.a14} />
-        <Row label="Home ownership" value={A.a13} />
+        <Row label="Home ownership" value={A.a13 || P.p2} />
+        {A.a13 && P.p2 && A.a13 !== P.p2 && (
+  <p style={{ color: C.alert, fontSize: 13, marginBottom: 12 }}>
+    Your ownership answers differ: Section A says {A.a13}; Section P says {P.p2}. Clarify the living arrangement and any required permissions before planning work.
+  </p>
+)}
         <Row label="Budget range" value={P.p4} />
         <Row label="Will remain home during construction" value={P.p13} />
       </ProfilePanel>
