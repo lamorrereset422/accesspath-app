@@ -452,7 +452,7 @@ const PRICING_TIERS = [
     price: "$39",
     cadence: "one-time",
     tagline: "Everything in Full Assessment, plus contractor-ready deliverables.",
-    features: ["Everything in Full Assessment", "Accessibility Priority Plan — coming soon", "Contractor Preparation Package — coming soon", "Funding & Documentation Checklist — coming soon"],
+    features: ["Everything in Full Assessment", "Accessibility Priority Plan", "Contractor Preparation Package", "Funding & Documentation Checklist"],
     sectionsIncluded: "all",
   },
 ];
@@ -2003,7 +2003,7 @@ function TermsOfServiceView({ onExit }) {
         You agree not to use AccessPath for any unlawful purpose, attempt to access other users' accounts or data, or interfere with the app or its infrastructure.
       </LegalSection>
       <LegalSection title="Pricing tiers">
-        AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. Features marked “coming soon” are not available at the time of purchase.
+        AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. 
       </LegalSection>
       <LegalSection title="Intellectual property">
         The AccessPath app, design, and content are owned by us. Your assessment answers and generated deliverables belong to you — you're free to use, print, or share your own Contractor Package, Priority Plan, and Funding Checklist as you see fit.
