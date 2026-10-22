@@ -3,16 +3,39 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require("@supabase/supabase-js");
 
-const supabase = createClient(
-  "https://obylhtfhlioplwscecfs.supabase.co",
-  "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT"
-);
+const SUPABASE_URL = "https://obylhtfhlioplwscecfs.supabase.co";
+// Publishable key: public by design (also in the browser app).
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Map internal plan IDs to Stripe Price IDs.
-const PRICE_IDS = {
-  complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
-  contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
-};
+const IS_TEST_MODE = (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
+
+const PRICE_IDS = IS_TEST_MODE
+  ? {
+      complete: process.env.STRIPE_TEST_PRICE_COMPLETE,
+      contractor: process.env.STRIPE_TEST_PRICE_CONTRACTOR,
+    }
+  : {
+      complete: "price_1U3Paf72BfjzdmTjNjFrAQct",
+      contractor: "price_1U3Paa72BfjzdmTjhjInQZjF",
+    };
+
+// Tier order: free < complete < contractor. Used to refuse checkouts that
+// would not raise the user's plan.
+const TIER_RANK = { free: 0, complete: 1, contractor: 2 };
+
+// Read a stored plan in either format: a JSON string such as "free", or an
+// object with planId. Returns null if unreadable or unrecognized (fail closed).
+function storedPlanRank(rawValue) {
+  try {
+    const parsed = JSON.parse(rawValue);
+    const planId = typeof parsed === "string" ? parsed : parsed && parsed.planId;
+    return Object.prototype.hasOwnProperty.call(TIER_RANK, planId) ? TIER_RANK[planId] : null;
+  } catch {
+    return null;
+  }
+}
 
 exports.handler = async (event) => {
   // Only allow POST requests
@@ -33,12 +56,55 @@ exports.handler = async (event) => {
 
     const { planId } = JSON.parse(event.body || "{}");
 
-    const priceId = PRICE_IDS[planId];
+    const priceId = Object.prototype.hasOwnProperty.call(PRICE_IDS, planId) ? PRICE_IDS[planId] : null;
     if (!priceId) {
       return { statusCode: 400, body: JSON.stringify({ error: "Unknown plan" }) };
     }
+    // Read the user's current plan with their own sign-in, so the database's
+    // security rules apply. No plan row means Free.
+    const userDb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: planRow, error: planError } = await userDb
+      .from("accesspath_storage")
+      .select("value")
+      .eq("user_id", user.id)
+      .eq("key", "accesspath:plan")
+      .maybeSingle();
 
-    const siteUrl = process.env.URL || "https://accesspath-app.netlify.app";
+    if (planError) {
+      console.error("create-checkout plan read error:", planError.message);
+      return { statusCode: 503, body: JSON.stringify({ error: "We couldn't check your current plan. Please try again." }) };
+    }
+
+    // Fail closed: if the stored plan can't be read, don't start a checkout.
+    const currentRank = planRow ? storedPlanRank(planRow.value) : TIER_RANK.free;
+    if (currentRank === null) {
+      console.error(`create-checkout: unreadable stored plan for user ${user.id}`);
+      return { statusCode: 503, body: JSON.stringify({ error: "We couldn't check your current plan. Please contact hello.accesspath@outlook.com." }) };
+    }
+
+    // Refuse checkouts that would not raise the plan (same tier or lower).
+    if (TIER_RANK[planId] <= currentRank) {
+      return { statusCode: 409, body: JSON.stringify({ error: "Your current plan already includes this.", code: "already_has_plan" }) };
+    }
+
+    const returnUrl = process.env.CHECKOUT_RETURN_URL;
+if (!returnUrl) {
+  throw new Error("CHECKOUT_RETURN_URL is required.");
+}
+
+const returnOrigin = new URL(returnUrl).origin;
+const allowedOrigin = IS_TEST_MODE
+  ? /^https:\/\/deploy-preview-\d+--accesspath-app\.netlify\.app$/.test(returnOrigin)
+  : returnOrigin === "https://accesspath-app.netlify.app";
+
+if (!allowedOrigin) {
+  throw new Error("Checkout return URL does not match Stripe mode.");
+}
+
+const siteUrl = returnOrigin;
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -47,7 +113,7 @@ exports.handler = async (event) => {
       customer_email: user.email,
       client_reference_id: user.id,
       metadata: { userId: user.id, planId },
-      success_url: `${siteUrl}/?checkout=success`,
+      success_url: `${siteUrl}/?checkout=success&plan=${planId}`,
       cancel_url: `${siteUrl}/?checkout=cancelled`,
     });
 

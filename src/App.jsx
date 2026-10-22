@@ -8,7 +8,7 @@ import {
 
 /* ---------------------------------------------------------------
    Palette + type tokens
-   bg: soft warm paper, not the default cream/terracotta combo.
+   bg: soft warm paper, not the default cream/terracotta combo.function 
    accent: grounded sage (calm, not clinical or "medical green").
    gold: warm marker color for in-progress / attention.
    alert: muted brick, used only for safety flags — never bright red.
@@ -452,13 +452,47 @@ const PRICING_TIERS = [
     price: "$39",
     cadence: "one-time",
     tagline: "Everything in Full Assessment, plus contractor-ready deliverables.",
-    features: ["Everything in Full Assessment", "Accessibility Priority Plan — coming soon", "Contractor Preparation Package — coming soon", "Funding & Documentation Checklist — coming soon"],
+    features: ["Everything in Full Assessment", "Accessibility Priority Plan", "Contractor Preparation Package", "Funding & Documentation Checklist"],
     sectionsIncluded: "all",
   },
 ];
 
+// Tier order: free < complete < contractor. Anything unrecognized counts as Free.
+const TIER_RANK = { free: 0, complete: 1, contractor: 2 };
+
+function tierRank(planId) {
+  return Object.prototype.hasOwnProperty.call(TIER_RANK, planId) ? TIER_RANK[planId] : 0;
+}
+
+function tierFor(planId) {
+  return PRICING_TIERS.find((t) => t.id === planId) || PRICING_TIERS[0];
+}
+
+// Read a stored plan in either format: a JSON string such as "free", or an
+// object with planId. Unknown or unreadable values mean Free.
+function parseStoredPlan(rawValue) {
+  try {
+    const parsed = JSON.parse(rawValue);
+    const planId = typeof parsed === "string" ? parsed : parsed && parsed.planId;
+    return Object.prototype.hasOwnProperty.call(TIER_RANK, planId) ? planId : "free";
+  } catch {
+    return "free";
+  }
+}
+
+// Only ever send people to Stripe's real checkout site.
+function isStripeCheckoutUrl(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "checkout.stripe.com";
+  } catch {
+    return false;
+  }
+}
+
 function isSectionLocked(sectionId, planId) {
-  const tier = PRICING_TIERS.find((t) => t.id === planId) || PRICING_TIERS[1];
+  const tier = tierFor(planId);
   if (tier.sectionsIncluded === "all") return false;
   return !tier.sectionsIncluded.includes(sectionId);
 }
@@ -1348,10 +1382,52 @@ function ProfileView({ allData, onExit, currentPlan, onOpenPriority, onOpenContr
 /* ---------------------------------------------------------------
    Pricing view
 ----------------------------------------------------------------*/
-function PricingView({ currentPlan, onSelectPlan, onStartCheckout, onExit }) {
+function CheckoutNotice({ notice, onCheckAgain, onDismiss }) {
+  let message = null;
+  if (notice) {
+    const planName = notice.planId ? tierFor(notice.planId).name : "";
+    if (notice.state === "processing") {
+      message = "Checking your plan status. If you completed a payment, confirmation usually takes a few seconds.";
+    } else if (notice.state === "ready") {
+      message = `Your ${planName} plan is active.`;
+    } else if (notice.state === "delayed") {
+     message = "We haven't confirmed a purchase for this plan. If you completed a payment, confirmation may take a few minutes. Please don't start another checkout while that payment is being confirmed.";
+    } else if (notice.state === "cancelled") {
+      message = "Checkout was canceled. Your plan was not changed.";
+    }
+  }
+  const buttonStyle = {
+    marginTop: 10, marginRight: 12, padding: "8px 14px", borderRadius: 8,
+    border: `1px solid ${C.accent}`, background: "transparent", color: C.accent,
+    fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer",
+  };
+  return (
+    <div role="status" aria-live="polite" className="max-w-2xl mx-auto px-6">
+      {message && (
+        <div style={{ marginTop: 16, background: C.panel, border: `1.5px solid ${C.accent}`, borderRadius: 10, padding: "14px 16px" }}>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: C.ink, lineHeight: 1.5 }}>{message}</p>
+          {notice.state === "delayed" && (
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.inkSoft, marginTop: 6 }}>
+              Questions? Contact hello.accesspath@outlook.com.
+            </p>
+          )}
+          {notice.state === "delayed" && (
+            <button type="button" onClick={onCheckAgain} style={buttonStyle}>Check again</button>
+          )}
+          {(notice.state === "ready" || notice.state === "cancelled") && (
+            <button type="button" onClick={onDismiss} style={buttonStyle}>Dismiss</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PricingView({ currentPlan, onStartCheckout, checkoutBusy, checkoutError, onExit }) {
+  const currentRank = tierRank(currentPlan);
   return (
     <div className="max-w-xl mx-auto px-6 py-14">
-      <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
+      <button type="button" onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
         <ChevronLeft size={16} /> Back to your assessment
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 8 }}>Choose your plan</h1>
@@ -1362,14 +1438,31 @@ function PricingView({ currentPlan, onSelectPlan, onStartCheckout, onExit }) {
         Paid plans are secure one-time purchases processed by Stripe. Access is connected to your signed-in AccessPath account.
       </p>
 
+      {checkoutBusy && (
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13.5, color: C.inkSoft, lineHeight: 1.5, marginBottom: 16 }}>
+          Upgrades are paused while a purchase is being started or confirmed.
+        </p>
+      )}
+      <div role="alert">
+        {checkoutError && (
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: C.ink, background: C.panel, border: `2px solid ${C.ink}`, borderRadius: 8, padding: "10px 12px", marginBottom: 16, lineHeight: 1.5 }}>
+            {checkoutError}
+          </p>
+        )}
+      </div>
+
       <div className="flex flex-col gap-4">
         {PRICING_TIERS.map((tier) => {
-          const active = currentPlan === tier.id;
+          const rank = tierRank(tier.id);
+          const isCurrent = rank === currentRank;
+          const isIncluded = rank < currentRank;
+          const canBuy = rank > currentRank && !checkoutBusy;
+          const label = isCurrent ? "Your current plan" : isIncluded ? "Included in your plan" : `Upgrade to ${tier.name}`;
           return (
             <div
               key={tier.id}
               style={{
-                background: C.panel, border: `1.5px solid ${active ? C.accent : C.line}`, borderRadius: 12, padding: "20px 22px",
+                background: C.panel, border: `1.5px solid ${isCurrent ? C.accent : C.line}`, borderRadius: 12, padding: "20px 22px",
               }}
             >
               <div className="flex items-start justify-between mb-2">
@@ -1389,15 +1482,16 @@ function PricingView({ currentPlan, onSelectPlan, onStartCheckout, onExit }) {
                 ))}
               </div>
               <button
-                onClick={() => (tier.id === "free" ? onSelectPlan(tier.id) : onStartCheckout(tier.id))}
-                disabled={active}
+                type="button"
+                onClick={canBuy ? () => onStartCheckout(tier.id) : undefined}
+                disabled={!canBuy}
                 style={{
-                  width: "100%", padding: "10px 0", borderRadius: 8, border: active ? `1.5px solid ${C.accent}` : "none",
-                  background: active ? "transparent" : C.accent, color: active ? C.accent : "#fff",
-                  fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: active ? "default" : "pointer",
+                  width: "100%", padding: "10px 0", borderRadius: 8, border: canBuy ? "none" : `1.5px solid ${C.accent}`,
+                  background: canBuy ? C.accent : "transparent", color: canBuy ? "#fff" : C.accent,
+                  fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600, cursor: canBuy ? "pointer" : "default",
                 }}
               >
-                {active ? "Current plan" : "Choose this plan"}
+                {label}
               </button>
             </div>
           );
@@ -1457,7 +1551,11 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
       </p>
       {P.p18 && (
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, marginBottom: 28 }}>
-          You told us <strong>{P.p18}</strong> feels most urgent to you.
+          {P.p18 === "Not sure yet" ? (
+  "You haven't identified a first priority yet. Review the categories below to help decide where to begin."
+) : (
+  <>You told us <strong>{P.p18}</strong> feels most urgent to you.</>
+)}
         </p>
       )}
       {!P.p18 && <div style={{ marginBottom: 28 }} />}
@@ -1467,7 +1565,7 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
         color={C.alert}
         description="Flagged directly from your answers — falls, evacuation risk, or feeling unsafe."
         safetyStyleItems={safetyItems}
-        emptyText="Nothing flagged here yet — that's good news."
+        emptyText="No safety concerns were flagged from the answers provided so far. Unanswered questions may leave concerns unidentified; this does not confirm that the home is safe."
       />
       <PriorityCategory
         title="Essential Access"
@@ -1486,7 +1584,7 @@ function PriorityPlanView({ allData, onExit, onOpenContractor }) {
       <PriorityCategory
         title="Future Planning"
         color={C.inkFaint}
-        description="Living spaces, outdoor areas, and technology — worth planning for, less urgent right now."
+        description="Living spaces, outdoor areas, and technology — review these needs alongside your other priorities. Their urgency depends on your circumstances."
         noteStyleItems={future}
         emptyText="No specific notes yet from Sections K, L, or M."
       />
@@ -1519,9 +1617,15 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
   const barrierSections = collectBarrierNotes(allData, ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M"]);
 
   const questions = [];
-  if (A.a13 === "Rent") questions.push("Can you help document this work in a way my landlord would need to approve it?");
+ if (A.a13 === "Rent" || P.p2 === "Rent") questions.push("What property-owner permissions may be needed, and can you help document the proposed work for approval?");
   if (allData.D?.answers?.d4 === "Yes") questions.push("What ramp or lift options would fit our entrance, given the step height and available space?");
-  if (P.p4) questions.push(`Our rough budget range is ${P.p4} — what scope of work is realistic within that?`);
+ if (P.p4 === "No budget in mind yet") {
+   questions.push("Can you help estimate costs and explain options so I can establish a realistic budget?");
+} else if (P.p4 === "Prefer not to answer") {
+  questions.push("Can you provide itemized costs and scope options without requiring me to disclose a budget?");
+} else if (["Under $1,000", "$1,000–$5,000", "$5,000–$20,000", "$20,000–$50,000", "Over $50,000"].includes(P.p4)) {
+  questions.push(`Our rough budget range is ${P.p4} — what scope of work is realistic within that?`);
+}
   if (P.p13 === "Yes") questions.push("How would you sequence the work so I can keep living here during construction?");
   questions.push("Can you share references from other accessibility-focused projects?");
   questions.push("What's your estimated timeline, and what could extend it?");
@@ -1533,18 +1637,26 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 8 }}>Contractor Preparation Package</h1>
       <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14.5, color: C.inkSoft, lineHeight: 1.6, marginBottom: 28 }}>
-        Everything a contractor would ask for, gathered before they ever walk in the door.
+        A starting summary of the answers and measurements you've provided. Review missing details with your contractor before planning work.
       </p>
 
       <ProfilePanel title="Project summary">
         <Row label="This project is for" value={A.a2} />
         <Row label="Overall goal" value={A.a14} />
-        <Row label="Home ownership" value={A.a13} />
+        <Row label="Home ownership" value={A.a13 || P.p2} />
+        {A.a13 && P.p2 && A.a13 !== P.p2 && (
+  <p style={{ color: C.alert, fontSize: 13, marginBottom: 12 }}>
+    Your ownership answers differ: Section A says {A.a13}; Section P says {P.p2}. Clarify the living arrangement and any required permissions before planning work.
+  </p>
+)}
         <Row label="Budget range" value={P.p4} />
         <Row label="Will remain home during construction" value={P.p13} />
       </ProfilePanel>
 
       <ProfilePanel title="Mobility device specifications" subtitle="From Section B">
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 12 }}>
+  Only recorded answers are shown. Missing device details or measurements have not been provided; confirm them before planning work.
+</p>
         <Row label="Device type" value={B.b1} />
         <Row label="Overall width" value={formatAnswer({ type: "measurement" }, B.b2)} />
         <Row label="Occupied width" value={formatAnswer({ type: "measurement" }, B.b3)} />
@@ -1556,6 +1668,9 @@ function ContractorPackageView({ allData, onExit, onOpenFunding }) {
       </ProfilePanel>
 
       <ProfilePanel title="Caregiver access needs" subtitle="From Section N">
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 12 }}>
+  Only recorded answers are shown. Missing caregiver information has not been provided; it does not mean assistance or access space is unnecessary.
+</p>
         <Row label="Has a caregiver" value={N.n1} />
         <Row label="Needs full-home access" value={N.n3} />
         <Row label="Space needed to assist with physical tasks" value={N.n5} />
@@ -1643,20 +1758,19 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
   const P = allData.P?.answers || {};
   const renting = P.p2 === "Rent";
   const mightHaveInsurance = P.p5 === "Yes" || P.p5 === "Not sure";
-  const hasEstimates = P.p10 && P.p10 !== "No, not yet";
+ const hasEstimates = ["Yes, one", "Yes, more than one"].includes(P.p10);
 
   const items = [
-    { label: "Landlord or property-owner permission", note: "Needed before modifying a rented home.", status: !renting ? "na" : P.p3 === "Yes" ? "done" : "todo" },
-    { label: "Insurance provider contacted", note: "Ask specifically about coverage for accessibility modifications.", status: !mightHaveInsurance ? "na" : P.p6 === "Yes" ? "done" : "todo" },
-    { label: "Medicaid or public support program checked", note: "Some programs cover home modifications tied to medical need.", status: P.p7 === "Yes" ? "done" : P.p7 === "No" ? "na" : "todo" },
-    { label: "Grant options explored", note: "Local and national accessibility grants can offset cost significantly.", status: P.p8 && P.p8.startsWith("Yes") ? "done" : "todo" },
+   { label: "Landlord or property-owner permission", note: "For rented homes, obtain permission. For other or unanswered living arrangements, clarify whether permission is needed.", status: P.p2 === "Own" ? "na" : renting && P.p3 === "Yes" ? "done" : "todo" },
+   { label: "Insurance provider contacted", note: "If insurance may apply, ask about coverage for accessibility modifications. An unanswered insurance question still needs clarification.", status: P.p5 === "No" ? "na" : mightHaveInsurance && P.p6 === "Yes" ? "done" : "todo" },
+    { label: "Public support options and coverage checked", note: P.p7 === "Yes" ? "You use a public support program. Confirm whether it can help with home modifications; your answer does not confirm coverage was checked." : "Clarify whether a public support program could help. Your answer does not confirm that options or coverage were checked.", status: "todo" },
+    { label: "Grant exploration or application started", note: "Starting this process does not mean an application is complete or funding is approved.", status: ["Yes, applying", "Yes, exploring options"].includes(P.p8) ? "done" : "todo" },
     { label: "Financing plan identified, if needed", note: "A loan or payment plan, if the project needs one.", status: P.p9 === "No" ? "na" : P.p9 === "Yes" ? "todo" : "todo" },
     { label: "Contractor estimates collected", note: "At least one detailed estimate to work from.", status: hasEstimates ? "done" : "todo" },
-    { label: "Estimates cover comparable scope", note: "So you're comparing apples to apples across bids.", status: !hasEstimates ? "na" : P.p11 === "Yes" ? "done" : "todo" },
-    { label: "Contractor credentials verified", note: "License, insurance, and accessibility-specific experience.", status: P.p12 === "Yes" ? "done" : "todo" },
-    { label: "Documentation ready for a contractor", note: "Measurements, photos, and your specific needs, organized.", status: P.p16 === "Yes, most of it" ? "done" : "todo" },
-  ];
-
+    { label: "Estimates cover comparable scope", note: "Compare the work included in each estimate. If you have not answered the estimates question, clarify that first.", status: P.p10 === "No, not yet" ? "na" : hasEstimates && P.p11 === "Yes" ? "done" : "todo" },
+    { label: "Contractor credential checks started", note: "Check license, insurance, and accessibility experience separately. A Yes answer confirms at least one check, not all three.", status: P.p12 === "Yes" ? "done" : "todo" },
+    { label: "Most contractor documentation gathered", note: "Review measurements, photos, and your needs with the contractor to identify anything still missing.", status: P.p16 === "Yes, most of it" ? "done" : "todo" },
+    ];
   const doneCount = items.filter((i) => i.status === "done").length;
   const applicableCount = items.filter((i) => i.status !== "na").length;
 
@@ -1716,7 +1830,7 @@ function FundingChecklistView({ allData, onExit, onOpenPriority, onOpenContracto
 ----------------------------------------------------------------*/
 function Dashboard({ allData, onOpen, onOpenProfile, onOpenProfileSwitcher, onOpenPricing, onOpenPrivacy, onOpenTerms, overallPct, loadErrors, currentPlan, activeProfileName }) {
     const hasLoadError = !!loadErrors && Object.keys(loadErrors).length > 0;
-      const tier = PRICING_TIERS.find((t) => t.id === currentPlan) || PRICING_TIERS[1];
+      const tier = tierFor(currentPlan);
   return (
     <div className="max-w-2xl mx-auto px-6 py-14">
       <div aria-live="polite" className="sr-only">AccessPath home dashboard</div>
@@ -1889,7 +2003,7 @@ function TermsOfServiceView({ onExit }) {
         You agree not to use AccessPath for any unlawful purpose, attempt to access other users' accounts or data, or interfere with the app or its infrastructure.
       </LegalSection>
       <LegalSection title="Pricing tiers">
-        AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. Features marked “coming soon” are not available at the time of purchase.
+        AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. 
       </LegalSection>
       <LegalSection title="Intellectual property">
         The AccessPath app, design, and content are owned by us. Your assessment answers and generated deliverables belong to you — you're free to use, print, or share your own Contractor Package, Priority Plan, and Funding Checklist as you see fit.
@@ -1956,6 +2070,16 @@ export default function AccessPathApp({ userId, userEmail, accessToken }) {
   const [showCompletion, setShowCompletion] = useState(false);
 const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("free");
+  // Read the plan the server has stored. Returns a recognized plan id
+  // ("free" if none is saved yet), or null if the read itself failed.
+  const readServerPlan = async () => {
+    try {
+      const res = await window.storage.get("accesspath:plan");
+      return parseStoredPlan(res.value);
+    } catch (e) {
+      return isNotFound(e) ? "free" : null;
+    }
+  };
   const [profiles, setProfiles] = useState([{ id: "default", name: "My Profile" }]);
 const [activeProfileId, setActiveProfileId] = useState("default");
 const [loadErrors, setLoadErrors] = useState({});
@@ -2000,27 +2124,9 @@ const switchToProfile = (id) => {
       if (cancelled) return;
       setAllData(Object.fromEntries(results.map((r) => [r.id, r.data])));
       setLoadErrors(Object.fromEntries(results.filter((r) => r.failed).map((r) => [r.id, true])));
-      const checkoutStatus = new URLSearchParams(window.location.search).get("checkout");
-      const attempts = checkoutStatus === "success" ? 6 : 1;
-      for (let attempt = 0; attempt < attempts; attempt += 1) {
-        try {
-          const planRes = await window.storage.get("accesspath:plan");
-          if (planRes && planRes.value) {
-            const parsed = JSON.parse(planRes.value);
-            const planId = typeof parsed === "string" ? parsed : parsed.planId;
-            if (planId) setCurrentPlan(planId);
-            break;
-          }
-        } catch (e) {
-          /* no paid plan saved yet — remain on Free */
-        }
-        if (attempt < attempts - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-      if (checkoutStatus) {
-        window.history.replaceState({}, "", window.location.pathname);
-      }
+      const serverPlan = await readServerPlan();
+      if (cancelled) return;
+      if (serverPlan) setCurrentPlan(serverPlan);
     })();
         return () => { cancelled = true; };
   }, [activeProfileId]);
@@ -2066,17 +2172,84 @@ const loadProfileList = async () => {
       setRetrying(false);
     }
   };
-  const handleSelectPlan = async (planId) => {
-    setCurrentPlan(planId);
-    try {
-      await window.storage.set("accesspath:plan", JSON.stringify(planId));
-    } catch (e) {
-      console.error("AccessPath: failed to save plan", e);
+  // Checkout: starting a purchase and returning from Stripe.
+  const [checkoutStarting, setCheckoutStarting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+
+  // Returning from Stripe. The address only says what to wait for; access
+  // always comes from the plan stored on the server (written by the webhook).
+  const [checkoutReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("checkout");
+    const plan = params.get("plan");
+    if (status === "success") {
+      return { status: "success", expectedPlan: plan === "complete" || plan === "contractor" ? plan : null };
     }
-    setShowPricing(false);
-  };
+    if (status === "cancelled") return { status: "cancelled", expectedPlan: null };
+    return null;
+  });
+  const [checkoutNotice, setCheckoutNotice] = useState(null);
+  const [checkRound, setCheckRound] = useState(0);
+
+  // Remove the checkout marker from the address bar right away.
+  useEffect(() => {
+    if (!checkoutReturn) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("checkout");
+    url.searchParams.delete("plan");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [checkoutReturn]);
+
+  // Check the server: every 2 s for 20 s, then every 5 s, up to 90 s.
+  // "Ready" means the stored plan is at least the tier just bought.
+  useEffect(() => {
+    if (!checkoutReturn) return;
+    if (checkoutReturn.status === "cancelled") {
+      setCheckoutNotice({ state: "cancelled" });
+      return;
+    }
+    let stopped = false;
+    let timer = null;
+    const expectedRank = checkoutReturn.expectedPlan ? tierRank(checkoutReturn.expectedPlan) : 1;
+    const startedAt = Date.now();
+    setCheckoutNotice({ state: "processing", planId: checkoutReturn.expectedPlan });
+
+    const check = async () => {
+      const serverPlan = await readServerPlan();
+      if (stopped) return;
+      if (serverPlan) setCurrentPlan(serverPlan);
+      if (serverPlan && tierRank(serverPlan) >= expectedRank) {
+        setCheckoutNotice({ state: "ready", planId: serverPlan });
+        return;
+      }
+      const elapsed = Date.now() - startedAt;
+      if (elapsed >= 90000) {
+        setCheckoutNotice({ state: "delayed", planId: checkoutReturn.expectedPlan });
+        return;
+      }
+      timer = setTimeout(check, elapsed < 20000 ? 2000 : 5000);
+    };
+    check();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [checkoutReturn, checkRound]);
+
+  // If the browser restores this page from its back/forward cache (for
+  // example after pressing Back on Stripe's page), clear "starting".
+  useEffect(() => {
+    const onPageShow = (e) => {
+      if (e.persisted) setCheckoutStarting(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const handleStartCheckout = async (planId) => {
+    if (checkoutStarting) return;
+    setCheckoutError("");
+    setCheckoutStarting(true);
     try {
       const res = await fetch("/.netlify/functions/create-checkout", {
         method: "POST",
@@ -2086,17 +2259,33 @@ const loadProfileList = async () => {
         },
         body: JSON.stringify({ planId }),
       });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url; // send them to Stripe's real checkout page
-      } else {
-        console.error("AccessPath: checkout error", data);
-        alert("Sorry, something went wrong starting checkout. Please try again.");
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
       }
-    } catch (e) {
-      console.error("AccessPath: checkout error", e);
-      alert("Sorry, something went wrong starting checkout. Please try again.");
+      if (res.ok && isStripeCheckoutUrl(data.url)) {
+        window.location.assign(data.url); // Stripe's real checkout page
+        return; // stay "starting" while the browser leaves
+      }
+      if (data && data.code === "already_has_plan") {
+        setCheckoutError("Your current plan already includes this.");
+        const serverPlan = await readServerPlan();
+        if (serverPlan) setCurrentPlan(serverPlan);
+      } else if (res.ok) {
+        setCheckoutError("We couldn't open the secure checkout page. Please try again.");
+      } else {
+        setCheckoutError(
+          data && typeof data.error === "string" && data.error
+            ? data.error
+            : "Sorry, something went wrong starting checkout. Please try again."
+        );
+      }
+    } catch {
+      setCheckoutError("Sorry, something went wrong starting checkout. Please check your connection and try again.");
     }
+    setCheckoutStarting(false);
   };
 
   const handleSave = (id, next) => {
@@ -2120,8 +2309,9 @@ const loadProfileList = async () => {
   return (
     <div style={{ background: C.bg, minHeight: 500, fontFamily: "'Inter', sans-serif" }}>
           <style>{FONTS}</style>
-            <LoadErrorBanner failedIds={Object.keys(loadErrors)} retrying={retrying} onRetry={retryLoad} />
-      {showPricing && <PricingView currentPlan={currentPlan} onSelectPlan={handleSelectPlan} onStartCheckout={handleStartCheckout} onExit={() => setShowPricing(false)} />}
+      <LoadErrorBanner failedIds={Object.keys(loadErrors)} retrying={retrying} onRetry={retryLoad} />
+      <CheckoutNotice notice={checkoutNotice} onCheckAgain={() => setCheckRound((n) => n + 1)} onDismiss={() => setCheckoutNotice(null)} />
+      {showPricing && <PricingView currentPlan={currentPlan} onStartCheckout={handleStartCheckout} checkoutBusy={checkoutStarting || (checkoutNotice !== null && (checkoutNotice.state === "processing" || checkoutNotice.state === "delayed"))} checkoutError={checkoutError} onExit={() => { setCheckoutError(""); setShowPricing(false); }} />}
       {!showPricing && showPrivacy && <PrivacyPolicyView onExit={() => setShowPrivacy(false)} />}
 {!showPricing && !showPrivacy && showTerms && <TermsOfServiceView onExit={() => setShowTerms(false)} />}  
      {!showPricing && showProfileSwitcher && <ProfileSwitcherView profiles={profiles} activeProfileId={activeProfileId} profilesStatus={profilesStatus} onRetryProfiles={loadProfileList} onSelect={handleSelectProfile} onCreate={handleCreateProfile} />}
