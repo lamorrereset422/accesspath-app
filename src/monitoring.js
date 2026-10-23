@@ -16,7 +16,10 @@ const DSN = import.meta.env.VITE_SENTRY_DSN;
 
 // If the site moves to a custom domain, add it here or reporting stops.
 export function environmentFromHostname(hostname) {
-  if (hostname === "accesspath-app.netlify.app") return "production";
+    if (
+    hostname === "accesspathliving.com" ||
+    hostname === "accesspath-app.netlify.app"
+  ) return "production";
   if (/^deploy-preview-\d+--accesspath-app\.netlify\.app$/.test(hostname)) return "preview";
   if (hostname === "localhost" || hostname === "127.0.0.1") return "development";
   return "unknown";
