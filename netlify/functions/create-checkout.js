@@ -98,7 +98,10 @@ if (!returnUrl) {
 const returnOrigin = new URL(returnUrl).origin;
 const allowedOrigin = IS_TEST_MODE
   ? /^https:\/\/deploy-preview-\d+--accesspath-app\.netlify\.app$/.test(returnOrigin)
-  : returnOrigin === "https://accesspath-app.netlify.app";
+   : [
+      "https://accesspathliving.com",
+      "https://accesspath-app.netlify.app",
+    ].includes(returnOrigin);
 
 if (!allowedOrigin) {
   throw new Error("Checkout return URL does not match Stripe mode.");
