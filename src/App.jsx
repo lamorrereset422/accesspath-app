@@ -1988,7 +1988,7 @@ function TermsOfServiceView({ onExit }) {
         <ChevronLeft size={16} /> Back
       </button>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, color: C.ink, fontWeight: 600, marginBottom: 4 }}>Terms of Service</h1>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: September 4, 2026</p>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: C.inkFaint, marginBottom: 28 }}>Last updated: October 24, 2026</p>
 
       <LegalSection title="Acceptance of terms">
         By using AccessPath, you agree to these Terms of Service. If you don't agree, please don't use the app.
@@ -2004,6 +2004,9 @@ function TermsOfServiceView({ onExit }) {
       </LegalSection>
       <LegalSection title="Pricing tiers">
         AccessPath offers Free, Full Assessment, and Contractor Ready tiers. Paid tiers are one-time purchases processed securely by Stripe. Prices and included features are displayed before checkout. 
+      </LegalSection>
+      <LegalSection title="Refunds & billing concerns">
+        For billing questions or refund requests, contact hello.accesspath@outlook.com. We'll reply within 3 business days. If we confirm an accidental duplicate charge for the same purchase, we'll promptly issue a full refund of the duplicate payment. Other refund requests are reviewed individually, consistent with applicable law. Your statutory consumer rights are unaffected. You may contact us for help without giving up your right to dispute a charge with your payment provider.
       </LegalSection>
       <LegalSection title="Intellectual property">
         The AccessPath app, design, and content are owned by us. Your assessment answers and generated deliverables belong to you — you're free to use, print, or share your own Contractor Package, Priority Plan, and Funding Checklist as you see fit.
