@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient.js";
 import { ForgotPasswordForm } from "./PasswordRecovery.jsx";
+import TurnstileCaptcha from "./TurnstileCaptcha.jsx";
 
 export default function AuthScreen({ notice }) {
   const [mode, setMode] = useState("signIn");
@@ -9,6 +10,9 @@ export default function AuthScreen({ notice }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [shownNotice, setShownNotice] = useState(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReset, setCaptchaReset] = useState(0);
+
   const headingRef = useRef(null);
   const submittingRef = useRef(false);
   const focusHeadingRef = useRef(false);
@@ -32,6 +36,7 @@ export default function AuthScreen({ notice }) {
     setMessage(null);
     setShownNotice(null);
     setPassword("");
+    setCaptchaToken("");
     focusHeadingRef.current = nextMode !== "forgot";
     setMode(nextMode);
   };
@@ -40,13 +45,31 @@ export default function AuthScreen({ notice }) {
     e.preventDefault();
     if (submittingRef.current) return;
 
+    if (!captchaToken) {
+      setMessage({
+        type: "error",
+        text: "Please wait for the security check to complete. If it needs your attention, follow the instructions above the button.",
+      });
+      return;
+    }
+
     submittingRef.current = true;
     setLoading(true);
     setMessage(null);
     setShownNotice(null);
 
+    // Capture the token for this request, then prevent reuse.
+    const requestToken = captchaToken;
+    setCaptchaToken("");
+
     try {
-      const credentials = { email: email.trim(), password };
+      const credentials = {
+        email: email.trim(),
+        password,
+        options: {
+          captchaToken: requestToken,
+        },
+      };
 
       if (mode === "signUp") {
         const { error } = await supabase.auth.signUp(credentials);
@@ -72,6 +95,8 @@ export default function AuthScreen({ notice }) {
         text: "We couldn't reach the server. Check your connection and try again.",
       });
     } finally {
+      setCaptchaToken("");
+      setCaptchaReset((value) => value + 1);
       submittingRef.current = false;
       setLoading(false);
     }
@@ -123,6 +148,8 @@ export default function AuthScreen({ notice }) {
       </div>
     );
   }
+
+  const unavailable = loading || !captchaToken;
 
   return (
     <div style={containerStyle}>
@@ -199,9 +226,15 @@ export default function AuthScreen({ notice }) {
           style={inputStyle}
         />
 
+        <TurnstileCaptcha
+          key={mode}
+          onToken={setCaptchaToken}
+          resetKey={captchaReset}
+        />
+
         <button
           type="submit"
-          aria-disabled={loading}
+          aria-disabled={unavailable}
           style={{
             width: "100%",
             padding: 10,
@@ -209,8 +242,8 @@ export default function AuthScreen({ notice }) {
             color: "#fff",
             border: "none",
             borderRadius: 6,
-            cursor: loading ? "wait" : "pointer",
-            opacity: loading ? 0.7 : 1,
+            cursor: unavailable ? "wait" : "pointer",
+            opacity: unavailable ? 0.7 : 1,
           }}
         >
           {loading
