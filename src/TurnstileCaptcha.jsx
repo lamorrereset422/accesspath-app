@@ -38,7 +38,7 @@ function loadTurnstile() {
         finish(new Error("Security check unavailable."));
         return;
       }
-      window.turnstile.ready(() => finish();
+      finish();
     };
     script.onerror = () => finish(new Error("Security check unavailable."));
     timer = setTimeout(
