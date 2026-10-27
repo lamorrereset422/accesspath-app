@@ -4,9 +4,22 @@
 //   503 {"status":"degraded"}  - Supabase did not answer in time or returned an error
 // It never returns error details, versions, or user data, and it reads no user tables.
 
-const SUPABASE_URL = "https://obylhtfhlioplwscecfs.supabase.co";
-// Publishable key: public by design (it is also in the browser app and create-checkout.js).
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT";
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
+const APP_ENV = process.env.ACCESSPATH_ENV;
+
+const expectedProject = APP_ENV === "production"
+  ? "obylhtfhlioplwscecfs"
+  : APP_ENV === "test"
+    ? "laxqancsddcufhwhcjlv"
+    : null;
+
+const configurationValid = Boolean(
+  expectedProject &&
+  SUPABASE_URL === `https://${expectedProject}.supabase.co` &&
+  SUPABASE_PUBLISHABLE_KEY
+);
 const TIMEOUT_MS = 5000;
 
 const HEADERS = {
@@ -22,7 +35,9 @@ function reply(statusCode, status, method) {
   };
 }
 
-async function supabaseIsReachable() {
+  if (!configurationValid) {
+    return false;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
