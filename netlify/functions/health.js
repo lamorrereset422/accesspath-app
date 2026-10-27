@@ -34,7 +34,7 @@ function reply(statusCode, status, method) {
     body: method === "HEAD" ? "" : JSON.stringify({ status }),
   };
 }
-
+async function supabaseIsReachable() {
   if (!configurationValid) {
     return false;
   }
