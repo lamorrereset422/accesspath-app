@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const SITE_KEY = "0x4AAAAAAFnDa5Ptz5WLwz53";
+const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
+
+if (!SITE_KEY) {
+  throw new Error("AccessPath security check configuration is missing.");
+}
 const SCRIPT_ID = "accesspath-turnstile";
 let scriptPromise = null;
 
