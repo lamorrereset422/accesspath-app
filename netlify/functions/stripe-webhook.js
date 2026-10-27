@@ -23,7 +23,8 @@ if (
 }
 
 const supabase = createClient(SUPABASE_URL, serviceRoleKey);
-
+const IS_TEST_MODE = secretKey.startsWith('sk_test_');
+const IS_LIVE_MODE = secretKey.startsWith('sk_live_');
 if (
   (APP_ENV === "production" && !IS_LIVE_MODE) ||
   (APP_ENV === "test" && !IS_TEST_MODE)
