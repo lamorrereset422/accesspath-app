@@ -78,7 +78,7 @@ export default function AuthScreen({ notice }) {
         } else {
           setMessage({
             type: "success",
-            text: "Check your email to confirm your account, then sign in.",
+            text: "Check your email, including your spam or junk folder, to confirm your account, then sign in.",
           });
         }
       } else {
