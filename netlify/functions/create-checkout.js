@@ -3,13 +3,38 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require("@supabase/supabase-js");
 
-const SUPABASE_URL = "https://obylhtfhlioplwscecfs.supabase.co";
-// Publishable key: public by design (also in the browser app).
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kTNhvFU_MUYaE_lSEXmqTQ_pte5rOAT";
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
+const APP_ENV = process.env.ACCESSPATH_ENV;
+
+if (!["production", "test"].includes(APP_ENV)) {
+  throw new Error("ACCESSPATH_ENV must be production or test.");
+}
+
+const expectedProject = APP_ENV === "production"
+  ? "obylhtfhlioplwscecfs"
+  : "laxqancsddcufhwhcjlv";
+
+if (
+  SUPABASE_URL !== `https://${expectedProject}.supabase.co` ||
+  !SUPABASE_PUBLISHABLE_KEY
+) {
+  throw new Error("Invalid Supabase environment configuration.");
+}
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Map internal plan IDs to Stripe Price IDs.
-const IS_TEST_MODE = (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_test_");
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
+const IS_TEST_MODE = stripeSecretKey.startsWith("sk_test_");
+const IS_LIVE_MODE = stripeSecretKey.startsWith("sk_live_");
+
+if (
+  (APP_ENV === "production" && !IS_LIVE_MODE) ||
+  (APP_ENV === "test" && !IS_TEST_MODE)
+) {
+  throw new Error("Stripe key mode does not match the app environment.");
+}
 
 const PRICE_IDS = IS_TEST_MODE
   ? {

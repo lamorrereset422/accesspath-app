@@ -3,13 +3,34 @@ const { createClient } = require('@supabase/supabase-js');
 
 const secretKey = process.env.STRIPE_SECRET_KEY || '';
 const stripe = Stripe(secretKey);
-const supabase = createClient(
-  'https://obylhtfhlioplwscecfs.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const APP_ENV = process.env.ACCESSPATH_ENV;
 
+if (!["production", "test"].includes(APP_ENV)) {
+  throw new Error("ACCESSPATH_ENV must be production or test.");
+}
+
+const expectedProject = APP_ENV === "production"
+  ? "obylhtfhlioplwscecfs"
+  : "laxqancsddcufhwhcjlv";
+
+if (
+  SUPABASE_URL !== `https://${expectedProject}.supabase.co` ||
+  !serviceRoleKey
+) {
+  throw new Error("Invalid Supabase webhook configuration.");
+}
+
+const supabase = createClient(SUPABASE_URL, serviceRoleKey);
 const IS_TEST_MODE = secretKey.startsWith('sk_test_');
 const IS_LIVE_MODE = secretKey.startsWith('sk_live_');
+if (
+  (APP_ENV === "production" && !IS_LIVE_MODE) ||
+  (APP_ENV === "test" && !IS_TEST_MODE)
+) {
+  throw new Error("Stripe key mode does not match the app environment.");
+}
 
 const PRICE_IDS = IS_TEST_MODE
   ? {
