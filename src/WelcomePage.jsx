@@ -287,6 +287,11 @@ export default function WelcomePage({ onGetStarted, onSignIn }) {
         </main>
 
         <footer className="ap-footer">
+            <nav aria-label="Policies" style={{ marginBottom: 16 }}>
+            <a href="?policy=privacy">Privacy Policy</a>
+            <span aria-hidden="true"> · </span>
+            <a href="?policy=terms">Terms of Service</a>
+          </nav>
           <p>
             AccessPath helps organize information for planning. It does
             not replace a professional home assessment, medical advice,
