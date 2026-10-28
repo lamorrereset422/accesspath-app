@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+import App, {
+  PrivacyPolicyView,
+  TermsOfServiceView,
+} from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import WelcomePage from "./WelcomePage.jsx";
 import { ResetPasswordScreen } from "./PasswordRecovery.jsx";
@@ -180,7 +183,21 @@ function Root() {
       />
     );
   }
+  const publicPolicy = initialQuery.get("policy");
 
+  const leavePublicPolicy = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("policy");
+    window.location.assign(url.pathname + url.search + url.hash);
+  };
+
+  if (publicPolicy === "privacy") {
+    return <PrivacyPolicyView onExit={leavePublicPolicy} />;
+  }
+
+  if (publicPolicy === "terms") {
+    return <TermsOfServiceView onExit={leavePublicPolicy} />;
+  }
     if (!session) {
     if (publicView === "welcome" && !notice) {
       return (
