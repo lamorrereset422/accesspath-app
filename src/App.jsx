@@ -1932,7 +1932,7 @@ function LegalSection({ title, children }) {
   );
 }
 
-function PrivacyPolicyView({ onExit }) {
+export function PrivacyPolicyView({ onExit }) {
   return (
     <div className="max-w-xl mx-auto px-6 py-14">
       <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
@@ -1981,7 +1981,7 @@ function PrivacyPolicyView({ onExit }) {
   );
 }
 
-function TermsOfServiceView({ onExit }) {
+export function TermsOfServiceView({ onExit }) {
   return (
     <div className="max-w-xl mx-auto px-6 py-14">
       <button onClick={onExit} className="flex items-center gap-1 mb-8" style={{ color: C.inkFaint, fontFamily: "'Inter', sans-serif", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}>
