@@ -178,7 +178,28 @@ export default function AuthScreen({ notice, initialMode = "signIn" }) {
           <p style={errorStyle}>{shownNotice.text}</p>
         )}
       </div>
-
+      {mode === "signUp" && (
+        <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+          Before creating an account, please read our{" "}
+          <a
+            href="?policy=terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#3D6B5C" }}
+          >
+            Terms of Service (opens in a new tab)
+          </a>{" "}
+          and{" "}
+          <a
+            href="?policy=privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#3D6B5C" }}
+          >
+            Privacy Policy (opens in a new tab)
+          </a>.
+        </p>
+      )}
       <form onSubmit={handleSubmit} aria-labelledby="auth-heading">
         <label htmlFor="auth-email" style={labelStyle}>
           Email
