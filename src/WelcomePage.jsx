@@ -1,39 +1,12 @@
 import React from "react";
+import { PRICING_TIERS } from "./plans.js";
 
-const plans = [
-  {
-    name: "Get Started",
-    price: "Free",
-    detail: "A place to begin",
-    features: [
-      "First three assessment sections",
-      "Save your progress and return later",
-      "Safety flag summary",
-    ],
-  },
-  {
-    name: "Full Assessment",
-    price: "$19",
-    detail: "One-time purchase",
-    features: [
-      "All 16 assessment sections",
-      "Your Home Accessibility Profile",
-      "Safety flags throughout",
-      "Unlimited edits and resets",
-    ],
-  },
-  {
-    name: "Contractor Ready",
-    price: "$39",
-    detail: "One-time purchase",
-    features: [
-      "Everything in Full Assessment",
-      "Accessibility Priority Plan",
-      "Contractor Preparation Package",
-      "Funding & Documentation Checklist",
-    ],
-  },
-];
+const plans = PRICING_TIERS.map((plan) => ({
+  ...plan,
+  detail: plan.cadence
+    ? `${plan.cadence.charAt(0).toUpperCase()}${plan.cadence.slice(1)} purchase`
+    : "A place to begin",
+}));
 
 export default function WelcomePage({ onGetStarted, onSignIn }) {
   return (

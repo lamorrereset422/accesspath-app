@@ -5,7 +5,7 @@ import {
   Lightbulb, HeartHandshake, ShieldAlert, DollarSign, ChevronLeft,
   ChevronRight, Check, AlertTriangle, X, Home as HomeIcon, FileText, Lock
 } from "lucide-react";
-
+import { PRICING_TIERS } from "./plans.js";
 /* ---------------------------------------------------------------
    Palette + type tokens
    bg: soft warm paper, not the default cream/terracotta combo.function 
@@ -427,35 +427,7 @@ const STATUS_LABEL = {
 /* ---------------------------------------------------------------
    Pricing tiers
 ----------------------------------------------------------------*/
-const PRICING_TIERS = [
-  {
-    id: "free",
-    name: "Get Started",
-    price: "Free",
-    cadence: "",
-    tagline: "Try the assessment with your first three sections.",
-    features: ["Sections A–C", "Save and resume anytime", "Safety flag summary"],
-    sectionsIncluded: ["A", "B", "C"],
-  },
-  {
-    id: "complete",
-    name: "Full Assessment",
-    price: "$19",
-    cadence: "one-time",
-    tagline: "All 16 sections and your complete Home Accessibility Profile.",
-    features: ["All 16 sections, A–P", "Full Home Accessibility Profile", "Safety flagging throughout", "Unlimited edits and resets"],
-    sectionsIncluded: "all",
-  },
-  {
-    id: "contractor",
-    name: "Contractor Ready",
-    price: "$39",
-    cadence: "one-time",
-    tagline: "Everything in Full Assessment, plus contractor-ready deliverables.",
-    features: ["Everything in Full Assessment", "Accessibility Priority Plan", "Contractor Preparation Package", "Funding & Documentation Checklist"],
-    sectionsIncluded: "all",
-  },
-];
+
 
 // Tier order: free < complete < contractor. Anything unrecognized counts as Free.
 const TIER_RANK = { free: 0, complete: 1, contractor: 2 };
