@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
+import WelcomePage from "./WelcomePage.jsx";
 import { ResetPasswordScreen } from "./PasswordRecovery.jsx";
 import { supabase } from "./supabaseClient.js";
 import { installSupabaseStorage } from "./supabaseStorage.js";
@@ -70,6 +71,7 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 function Root() {
+  const [publicView, setPublicView] = useState("welcome");
   const [session, setSession] = useState(undefined); // undefined = still checking
   const [, setFlagVersion] = useState(0); // re-check the shared flag when it changes
   const [leaving, setLeaving] = useState(false);
@@ -179,8 +181,49 @@ function Root() {
     );
   }
 
-  if (!session) {
-    return <AuthScreen notice={notice} />;
+    if (!session) {
+    if (publicView === "welcome" && !notice) {
+      return (
+        <WelcomePage
+          onGetStarted={() => setPublicView("signUp")}
+          onSignIn={() => setPublicView("signIn")}
+        />
+      );
+    }
+
+    return (
+      <>
+        <nav aria-label="Welcome page">
+          <button
+            type="button"
+            onClick={() => {
+              setNotice(null);
+              setPublicView("welcome");
+            }}
+            style={{
+              margin: "16px 24px",
+              padding: "8px 12px",
+              background: "none",
+              border: "1px solid #3D6B5C",
+              borderRadius: 6,
+              color: "#3D6B5C",
+              cursor: "pointer",
+              fontFamily: "sans-serif",
+              fontSize: 15,
+            }}
+          >
+            Back to welcome
+          </button>
+        </nav>
+        <AuthScreen
+          key={notice ? "notice" : publicView}
+          notice={notice}
+          initialMode={
+            !notice && publicView === "signUp" ? "signUp" : "signIn"
+          }
+        />
+      </>
+    );
   }
 
   installSupabaseStorage();

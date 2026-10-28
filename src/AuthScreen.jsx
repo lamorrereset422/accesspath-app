@@ -3,8 +3,8 @@ import { supabase } from "./supabaseClient.js";
 import { ForgotPasswordForm } from "./PasswordRecovery.jsx";
 import TurnstileCaptcha from "./TurnstileCaptcha.jsx";
 
-export default function AuthScreen({ notice }) {
-  const [mode, setMode] = useState("signIn");
+export default function AuthScreen({ notice, initialMode = "signIn" }) {
+  const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
